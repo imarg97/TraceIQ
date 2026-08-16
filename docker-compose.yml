@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: traceiq-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - AI_PROVIDER=auto
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./backend/uploads:/app/uploads
+
+  frontend:
+    build: ./frontend
+    container_name: traceiq-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

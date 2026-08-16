@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TraceIQ - AI Intelligence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Public+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: "#FF6B00",
+                            container: "#331500",
+                            hover: "#FF8533",
+                        },
+                        surface: {
+                            DEFAULT: "#0A0A0A",
+                            variant: "#141414",
+                            hover: "#1A1A1A",
+                        },
+                        on: {
+                            surface: {
+                                DEFAULT: "#FFFFFF",
+                                variant: "#A3A3A3",
+                            },
+                            primary: {
+                                DEFAULT: "#FFFFFF",
+                                container: "#FF6B00",
+                            }
+                        },
+                        success: "#10B981",
+                        warning: "#F59E0B",
+                        error: "#EF4444",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Space Grotesk", "sans-serif"],
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Public Sans", "sans-serif"]
+                    },
+                    boxShadow: {
+                        'glow-primary': '0 0 20px rgba(255, 107, 0, 0.3)',
+                        'glow-primary-strong': '0 0 30px rgba(255, 107, 0, 0.5)',
+                        'surface': '0 4px 20px rgba(0, 0, 0, 0.5)',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: #000000; color: #ffffff; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #FF6B00; }
+        .glass-panel {
+            background: rgba(10, 10, 10, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 107, 0, 0.1);
+        }
+        .orange-gradient-text {
+            background: linear-gradient(to right, #FF6B00, #FFA057);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="font-body antialiased min-h-screen flex flex-col pt-[72px] pb-[80px]">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 flex justify-between items-center px-6 py-4 bg-black border-b border-primary/20 shadow-glow-primary">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-2xl" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-headline text-2xl font-black tracking-tighter text-primary">TraceIQ</span>
+</div>
+<div class="hidden md:flex gap-6">
+<a class="font-headline text-label-md uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Dashboard</a>
+<a class="font-headline text-label-md uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Explorer</a>
+<a class="font-headline text-label-md uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Call Flow</a>
+<a class="font-headline text-label-md uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Issues</a>
+<a class="font-headline text-label-md uppercase tracking-wider text-primary border-b-2 border-primary pb-1 relative group" href="#">
+                    AI
+                    <span class="absolute -top-1 -right-2 w-2 h-2 bg-primary rounded-full shadow-glow-primary-strong"></span>
+</a>
+<a class="font-headline text-label-md uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Compare</a>
+</div>
+</div>
+<div class="flex items-center gap-4 text-primary">
+<button class="hover:bg-primary/10 p-2 rounded-full transition-colors active:scale-95">
+<span class="material-symbols-outlined">dark_mode</span>
+</button>
+<button class="w-8 h-8 rounded-full bg-surface-variant border border-primary/30 flex items-center justify-center overflow-hidden hover:border-primary transition-colors">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="A professional headshot of a network operations engineer. The individual is looking directly at the camera with a confident, neutral expression. The background is a dark, sleek command center environment with subtle glowing orange accents and blurred data screens. The lighting is dramatic, high-contrast, tech-focused studio lighting emphasizing a modern aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpepNeYUGaInI-w4QTwAlH7CUDpPlg5CQyoXCZfDmiU1yzqZoB-eZNcvgcT-ElOn4KptikDjhbN0z6TsVUGAhqJd2NKXn5ghm7UPp2rnUytFSOpfBB_dG02svuCNxdoVu4W-i1X0rgEN68-LUQM3eSOykeeuYG6r78CxJzNgBJQIsBHxFPd_0T6RFSDyhtCIaynHnhqtHpmoBl5o468LdBYEnUcII9C2tapSsFaWK9nUYNHLrT0Ff8XmJzl5WhpbgBje5FzRtWNro"/>
+</button>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col w-full max-w-7xl mx-auto px-4 md:px-8 py-6 gap-6 relative">
+<!-- Background Glow FX -->
+<div class="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
+<!-- AI Banner Strip -->
+<div class="w-full glass-panel rounded-2xl p-6 shadow-surface flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex items-start gap-4">
+<div class="p-3 bg-primary/10 rounded-xl border border-primary/20 text-primary mt-1">
+<span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">neurology</span>
+</div>
+<div>
+<h1 class="font-headline text-2xl md:text-3xl font-bold orange-gradient-text tracking-tight">Gemini Telecom Insights — ipsec_reg.pcap</h1>
+<p class="font-body text-on-surface-variant text-sm mt-1 flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                        AI Narrative Analysis &amp; Root Cause Diagnosis
+                    </p>
+</div>
+</div>
+<div class="flex gap-3 w-full md:w-auto mt-4 md:mt-0">
+<button class="flex-1 md:flex-none px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-lg font-label text-sm font-medium transition-colors shadow-[0_0_10px_rgba(255,107,0,0.1)] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                    Export AI Report
+                </button>
+<button class="flex-1 md:flex-none px-4 py-2 bg-primary hover:bg-primary-hover text-black rounded-lg font-label text-sm font-bold transition-all shadow-glow-primary hover:shadow-glow-primary-strong active:scale-95 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">refresh</span>
+                    Re-Analyze PCAP
+                </button>
+</div>
+</div>
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Left Column (55%) -->
+<div class="lg:col-span-7 flex flex-col gap-6">
+<!-- Executive Summary -->
+<div class="glass-panel rounded-xl p-6 shadow-surface">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-4 border-b border-white/5 pb-3">
+<span class="material-symbols-outlined text-primary text-[20px]">summarize</span>
+                        Executive Summary (Plain English)
+                    </h2>
+<div class="font-body text-on-surface-variant text-sm space-y-4 leading-relaxed">
+<p>The analyzed PCAP file captures an initial IMS registration sequence involving IPsec security association setup. The User Equipment (UE) initiates the process by sending a SIP REGISTER request to the P-CSCF.</p>
+<p>Upon receiving the initial REGISTER, the network responds correctly with a SIP 401 Unauthorized status, which is the expected behavior in IMS AKA (Authentication and Key Agreement). This 401 response contains the necessary authentication challenge (nonce, algorithm, etc.) required for the UE to calculate the correct response.</p>
+<p>The UE successfully extracts the challenge and initiates the second REGISTER request, including the required Authorization header with the calculated response. Simultaneously, the underlying IPsec tunnels (ESP) begin to establish to secure subsequent signaling.</p>
+<p>However, the narrative identifies a slight delay in the P-CSCF forwarding the second REGISTER to the S-CSCF, although the overall registration ultimately succeeds with a 200 OK. The delay appears isolated to internal node processing rather than network transport.</p>
+</div>
+</div>
+<!-- Anomalies & Issues -->
+<div class="glass-panel rounded-xl p-6 shadow-surface border-l-2 border-l-warning">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-warning text-[20px]">warning</span>
+                        Anomalies &amp; Issues Detected
+                    </h2>
+<div class="flex flex-col gap-3">
+<div class="bg-surface-variant/50 p-3 rounded-lg border border-warning/20 flex gap-3 items-start">
+<span class="material-symbols-outlined text-warning text-[18px] mt-0.5">error</span>
+<div>
+<p class="font-label text-sm font-medium text-on-surface">P-CSCF Processing Latency</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">Observed a 45ms delta between receiving UE's Auth REGISTER and forwarding to S-CSCF. Expected threshold is &lt;20ms.</p>
+</div>
+</div>
+<div class="bg-surface-variant/50 p-3 rounded-lg border border-warning/20 flex gap-3 items-start">
+<span class="material-symbols-outlined text-warning text-[18px] mt-0.5">error</span>
+<div>
+<p class="font-label text-sm font-medium text-on-surface">ESP Sequence Gap</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">Minor sequence number anomaly in early ESP packets, quickly recovered. Likely a brief fragmentation issue.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- What Went Well -->
+<div class="glass-panel rounded-xl p-6 shadow-surface border-l-2 border-l-success">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-success text-[20px]">check_circle</span>
+                        What Went Well
+                    </h2>
+<ul class="space-y-3 font-body text-sm text-on-surface-variant">
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-success text-[18px]">done</span>
+                            401 Challenge generated and formatted strictly according to 3GPP TS 24.229.
+                        </li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-success text-[18px]">done</span>
+                            AKA response calculation by UE was accurate and accepted.
+                        </li>
+<li class="flex items-center gap-3">
+<span class="material-symbols-outlined text-success text-[18px]">done</span>
+                            IPsec Security Associations (SAs) negotiated without cipher suite mismatch.
+                        </li>
+</ul>
+</div>
+<!-- Timeline -->
+<div class="glass-panel rounded-xl p-6 shadow-surface">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary text-[20px]">timeline</span>
+                        Timestamped Event Sequence
+                    </h2>
+<div class="relative pl-4 space-y-6 before:absolute before:inset-y-2 before:left-[23px] before:w-px before:bg-white/10">
+<!-- Event 1 -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute left-[-2px] w-[11px] h-[11px] rounded-full bg-black border-2 border-primary z-10 mt-1.5 shadow-[0_0_8px_rgba(255,107,0,0.6)]"></div>
+<div class="text-xs font-mono text-primary/80 pt-1 w-20 shrink-0">00:00.000</div>
+<div class="bg-surface-variant/30 p-3 rounded-lg border border-white/5 flex-1">
+<p class="font-label text-sm font-medium text-on-surface">Initial SIP REGISTER</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">UE → P-CSCF. Initiating unauthenticated registration.</p>
+</div>
+</div>
+<!-- Event 2 -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute left-[-2px] w-[11px] h-[11px] rounded-full bg-black border-2 border-primary z-10 mt-1.5"></div>
+<div class="text-xs font-mono text-primary/80 pt-1 w-20 shrink-0">00:00.125</div>
+<div class="bg-surface-variant/30 p-3 rounded-lg border border-white/5 flex-1">
+<p class="font-label text-sm font-medium text-on-surface">401 Unauthorized</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">P-CSCF → UE. Network issues AKA challenge.</p>
+</div>
+</div>
+<!-- Event 3 -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute left-[-2px] w-[11px] h-[11px] rounded-full bg-black border-2 border-warning z-10 mt-1.5 shadow-[0_0_8px_rgba(245,158,11,0.6)]"></div>
+<div class="text-xs font-mono text-warning/80 pt-1 w-20 shrink-0">00:00.340</div>
+<div class="bg-surface-variant/30 p-3 rounded-lg border border-warning/20 flex-1">
+<p class="font-label text-sm font-medium text-warning">Authenticated REGISTER</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">UE → P-CSCF. Response included. (Noted 45ms P-CSCF processing delay follows).</p>
+</div>
+</div>
+<!-- Event 4 -->
+<div class="relative flex gap-4 items-start">
+<div class="absolute left-[-2px] w-[11px] h-[11px] rounded-full bg-black border-2 border-success z-10 mt-1.5 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+<div class="text-xs font-mono text-success/80 pt-1 w-20 shrink-0">00:00.412</div>
+<div class="bg-surface-variant/30 p-3 rounded-lg border border-success/20 flex-1">
+<p class="font-label text-sm font-medium text-success">200 OK Registration Complete</p>
+<p class="font-body text-xs text-on-surface-variant mt-1">S-CSCF → P-CSCF → UE. IPsec tunnel fully established.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (45%) -->
+<div class="lg:col-span-5 flex flex-col gap-6">
+<!-- Protocol Distribution -->
+<div class="glass-panel rounded-xl p-6 shadow-surface">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-primary text-[20px]">bar_chart</span>
+                        Protocol Distribution
+                    </h2>
+<div class="space-y-4">
+<!-- SIP -->
+<div>
+<div class="flex justify-between text-xs font-label mb-1">
+<span class="text-on-surface">SIP</span>
+<span class="text-primary font-mono">42%</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary h-1.5 rounded-full shadow-[0_0_8px_rgba(255,107,0,0.8)]" style="width: 42%"></div>
+</div>
+</div>
+<!-- ESP -->
+<div>
+<div class="flex justify-between text-xs font-label mb-1">
+<span class="text-on-surface">ESP (IPsec)</span>
+<span class="text-primary/80 font-mono">35%</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary/80 h-1.5 rounded-full" style="width: 35%"></div>
+</div>
+</div>
+<!-- TCP -->
+<div>
+<div class="flex justify-between text-xs font-label mb-1">
+<span class="text-on-surface">TCP</span>
+<span class="text-primary/60 font-mono">12%</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary/60 h-1.5 rounded-full" style="width: 12%"></div>
+</div>
+</div>
+<!-- UDP -->
+<div>
+<div class="flex justify-between text-xs font-label mb-1">
+<span class="text-on-surface">UDP</span>
+<span class="text-primary/40 font-mono">8%</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary/40 h-1.5 rounded-full" style="width: 8%"></div>
+</div>
+</div>
+<!-- SCTP -->
+<div>
+<div class="flex justify-between text-xs font-label mb-1">
+<span class="text-on-surface">SCTP</span>
+<span class="text-primary/20 font-mono">3%</span>
+</div>
+<div class="w-full bg-surface-variant rounded-full h-1.5 overflow-hidden">
+<div class="bg-primary/20 h-1.5 rounded-full" style="width: 3%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Network Nodes -->
+<div class="glass-panel rounded-xl p-6 shadow-surface">
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-[20px]">router</span>
+                        Identified Network Nodes
+                    </h2>
+<div class="grid grid-cols-1 gap-3">
+<div class="flex items-center justify-between p-3 bg-surface-variant/40 rounded-lg border border-white/5 hover:border-primary/30 transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">smartphone</span>
+<span class="font-mono text-sm text-on-surface">10.154.22.8</span>
+</div>
+<span class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white rounded">UE</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-variant/40 rounded-lg border border-white/5 hover:border-primary/30 transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">dns</span>
+<span class="font-mono text-sm text-on-surface">172.24.0.46</span>
+</div>
+<span class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-primary/20 text-primary rounded border border-primary/20">P-CSCF</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-variant/40 rounded-lg border border-white/5 hover:border-primary/30 transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">dns</span>
+<span class="font-mono text-sm text-on-surface">172.24.0.50</span>
+</div>
+<span class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white rounded">S-CSCF</span>
+</div>
+<div class="flex items-center justify-between p-3 bg-surface-variant/40 rounded-lg border border-white/5 hover:border-primary/30 transition-colors group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary transition-colors">storage</span>
+<span class="font-mono text-sm text-on-surface">172.24.1.12</span>
+</div>
+<span class="px-2 py-1 text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white rounded">HSS</span>
+</div>
+</div>
+</div>
+<!-- Recommended Actions -->
+<div class="glass-panel rounded-xl p-6 shadow-surface relative overflow-hidden">
+<div class="absolute -right-10 -top-10 w-32 h-32 bg-primary/10 rounded-full blur-2xl"></div>
+<h2 class="font-headline text-lg font-semibold text-on-surface flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-primary text-[20px]">lightbulb</span>
+                        Recommended Actions
+                    </h2>
+<div class="space-y-4 font-body text-sm">
+<div class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0 border border-primary/30">1</div>
+<p class="text-on-surface-variant pt-0.5">Investigate P-CSCF node (172.24.0.46) CPU/Memory utilization during the 00:00.340 - 00:00.400 timestamp window to determine cause of 45ms latency.</p>
+</div>
+<div class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-white/10 text-white flex items-center justify-center font-bold text-xs shrink-0">2</div>
+<p class="text-on-surface-variant pt-0.5">Review MTU settings on the path between UE and P-CSCF to mitigate minor ESP fragmentation observed.</p>
+</div>
+<div class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-white/10 text-white flex items-center justify-center font-bold text-xs shrink-0">3</div>
+<p class="text-on-surface-variant pt-0.5">No action required for authentication vectors; HSS and S-CSCF interaction remains optimal.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Chat Bar -->
+<div class="fixed bottom-0 w-full bg-black/90 backdrop-blur-md border-t border-primary/20 py-4 px-6 z-40">
+<div class="max-w-4xl mx-auto flex items-center gap-4">
+<div class="p-2 bg-primary/10 rounded-lg text-primary border border-primary/20">
+<span class="material-symbols-outlined text-xl">smart_toy</span>
+</div>
+<div class="flex-1 relative group">
+<input class="w-full bg-surface-variant/50 border border-white/10 text-on-surface placeholder-on-surface-variant/50 rounded-xl px-4 py-3 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all font-body text-sm" placeholder="Ask Gemini AI a question about this capture..." type="text"/>
+<div class="absolute inset-0 rounded-xl bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"></div>
+</div>
+<button class="bg-primary hover:bg-primary-hover text-black w-12 h-12 rounded-xl flex items-center justify-center shadow-glow-primary hover:shadow-glow-primary-strong transition-all active:scale-95 group">
+<span class="material-symbols-outlined group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</body></html>

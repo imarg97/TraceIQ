@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TraceIQ Packet Explorer</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Public+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@400;500;600;700;900&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {},
+            borderRadius: {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            spacing: {},
+            fontFamily: {
+                    "headline": ["Space Grotesk", "sans-serif"],
+                    "display": ["Space Grotesk", "sans-serif"],
+                    "body": ["Inter", "sans-serif"],
+                    "label": ["Public Sans", "sans-serif"],
+                    "mono": ["JetBrains Mono", "monospace"]
+            },
+            fontSize: {}
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+        .cyber-grid { background-image: linear-gradient(to right, #1f1f1f 1px, transparent 1px), linear-gradient(to bottom, #1f1f1f 1px, transparent 1px); background-size: 40px 40px; }
+    </style>
+</head>
+<body class="bg-[#000000] text-zinc-300 font-body antialiased overflow-hidden selection:bg-[#FF6B00]/30 selection:text-[#FF6B00]">
+<nav class="bg-black text-[#FF6B00] font-headline text-label-sm uppercase tracking-wider font-bold fixed w-full top-0 z-50 border-b border-[#FF6B00]/20 shadow-[0_4px_20px_rgba(255,107,0,0.15)] flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="text-xl font-display font-black text-[#FF6B00] italic tracking-tighter">TraceIQ</span>
+</div>
+<div class="flex gap-1 h-full items-center">
+<a class="px-4 py-5 text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">Dashboard</a>
+<a class="px-4 py-5 text-[#FF6B00] border-b-2 border-[#FF6B00] pb-2 hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">Explorer</a>
+<a class="px-4 py-5 text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">Call Flow</a>
+<a class="px-4 py-5 text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">Issues</a>
+<a class="px-4 py-5 text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">AI</a>
+<a class="px-4 py-5 text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 transition-all active:scale-95 duration-75" href="#">Compare</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 p-2 rounded-full active:scale-95 duration-75">
+<span class="material-symbols-outlined" data-icon="dark_mode">dark_mode</span>
+</button>
+<button class="text-zinc-500 hover:text-zinc-300 transition-colors hover:bg-zinc-900/50 p-2 rounded-full active:scale-95 duration-75 relative">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-[#FF6B00] rounded-full shadow-[0_0_5px_rgba(255,107,0,1)]"></span>
+</button>
+<button class="ml-2 w-8 h-8 rounded-full bg-zinc-800 border border-[#FF6B00]/30 overflow-hidden hover:border-[#FF6B00] transition-colors">
+<img class="w-full h-full object-cover" data-alt="A futuristic minimalist user avatar icon, cyber ops theme, glowing orange accents against deep black." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsZ6YoHxUNQ9c_2AW2HhLvMpYq6dhZTPYzmB4iaussy4fdjC_ce92kpf5ZzNttPbB4-o7vjcusYWxbC1n4kUt-vBPPBaMf_AZ0ZvPvynJrTyVfXvHqJvSW_JT-syos8Zk5wu6sVSXIXsKrtrfdCmS3vgGuV6HKYGVB9I18l82-14B6z9ELuye_zwDjla_oEze1eYl_z2WBYEgr2YLZtd71xMy4afILP_EbcPjbiUzV3A3MbsbZGLVJM5bwNlZBz5FXGjJifM3WNF0"/>
+</button>
+</div>
+</nav>
+<nav class="bg-black text-[#FF6B00] font-body text-label-xs text-lg font-headline font-bold text-[#FF6B00] fixed left-0 top-16 bottom-0 w-20 z-40 border-r border-[#FF6B00]/10 flex flex-col items-center py-4 gap-2 transition-all duration-200">
+<button class="w-full bg-[#FF6B00]/10 text-[#FF6B00] border-r-2 border-[#FF6B00] flex flex-col items-center py-4 hover:bg-zinc-900 transition-all duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="analytics">analytics</span>
+<span class="text-[10px] tracking-widest uppercase">Packets</span>
+</button>
+<button class="w-full text-zinc-600 flex flex-col items-center py-4 hover:text-zinc-400 hover:bg-zinc-900 transition-all duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="swap_calls">swap_calls</span>
+<span class="text-[10px] tracking-widest uppercase">Streams</span>
+</button>
+<button class="w-full text-zinc-600 flex flex-col items-center py-4 hover:text-zinc-400 hover:bg-zinc-900 transition-all duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="rule">rule</span>
+<span class="text-[10px] tracking-widest uppercase">Analysis</span>
+</button>
+<button class="w-full text-zinc-600 flex flex-col items-center py-4 hover:text-zinc-400 hover:bg-zinc-900 transition-all duration-200">
+<span class="material-symbols-outlined mb-1" data-icon="filter_alt">filter_alt</span>
+<span class="text-[10px] tracking-widest uppercase">Filters</span>
+</button>
+<button class="w-full text-zinc-600 flex flex-col items-center py-4 hover:text-zinc-400 hover:bg-zinc-900 transition-all duration-200 mt-auto mb-8">
+<span class="material-symbols-outlined mb-1" data-icon="file_download">file_download</span>
+<span class="text-[10px] tracking-widest uppercase">Export</span>
+</button>
+</nav>
+<main class="fixed top-16 left-20 right-0 bottom-8 flex flex-col bg-[#050505]">
+<div class="h-12 border-b border-zinc-800/80 bg-black/50 flex items-center justify-between px-4">
+<div class="flex items-center gap-3">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2.5 top-1.5 text-zinc-500 text-sm">search</span>
+<input class="bg-zinc-900/50 border border-zinc-800 text-zinc-300 text-xs font-mono focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] rounded-sm pl-8 pr-3 py-1.5 w-80 outline-none placeholder:text-zinc-600 transition-all" placeholder="Filter by IP or Call-ID..." type="text"/>
+</div>
+<div class="relative">
+<select class="bg-zinc-900/50 border border-zinc-800 text-zinc-300 text-xs font-mono focus:border-[#FF6B00] rounded-sm pl-3 pr-8 py-1.5 appearance-none outline-none hover:border-zinc-700 transition-colors">
+<option>All Transactions</option>
+<option>SIP Only</option>
+<option>RTP Streams</option>
+<option>Diameter</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1.5 text-zinc-500 text-sm pointer-events-none">arrow_drop_down</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-800 hover:text-white text-zinc-400 px-3 py-1.5 text-[10px] font-headline uppercase tracking-wider rounded-sm transition-all flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">unfold_more</span>
+                    Expand All Nodes
+                </button>
+<button class="border border-[#FF6B00]/30 bg-[#FF6B00]/10 hover:bg-[#FF6B00]/20 text-[#FF6B00] px-3 py-1.5 text-[10px] font-headline uppercase tracking-wider rounded-sm transition-all flex items-center gap-1 shadow-[0_0_10px_rgba(255,107,0,0.1)]">
+<span class="material-symbols-outlined text-[14px]">ios_share</span>
+                    Export Analysis
+                </button>
+</div>
+</div>
+<div class="flex flex-col flex-1 overflow-hidden p-3 gap-3">
+<div class="flex-1 bg-[#0a0a0a] border border-zinc-800/80 rounded-sm overflow-hidden flex flex-col relative cyber-grid">
+<div class="absolute top-2 left-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest z-10 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">linear_scale</span> Call Flow Sequence
+                </div>
+<div class="flex w-full h-10 border-b border-zinc-800 bg-black/80 sticky top-0 z-20 mt-8">
+<div class="flex-1 flex flex-col items-center justify-center border-r border-zinc-800/50">
+<span class="text-xs font-bold text-zinc-200">UE</span>
+<span class="text-[9px] font-mono text-zinc-500">172.24.0.46</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center border-r border-zinc-800/50">
+<span class="text-xs font-bold text-zinc-200">P-CSCF</span>
+<span class="text-[9px] font-mono text-zinc-500">10.4.128.21</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center border-r border-zinc-800/50">
+<span class="text-xs font-bold text-zinc-200">S-CSCF</span>
+<span class="text-[9px] font-mono text-zinc-500">10.4.128.22</span>
+</div>
+<div class="flex-1 flex flex-col items-center justify-center">
+<span class="text-xs font-bold text-zinc-200">HSS</span>
+<span class="text-[9px] font-mono text-zinc-500">192.168.101.5</span>
+</div>
+</div>
+<div class="relative flex-1 overflow-auto w-full pt-4 pb-12">
+<div class="absolute top-0 bottom-0 left-[12.5%] w-px bg-zinc-800 border-l border-dashed border-zinc-700/50"></div>
+<div class="absolute top-0 bottom-0 left-[37.5%] w-px bg-zinc-800 border-l border-dashed border-zinc-700/50"></div>
+<div class="absolute top-0 bottom-0 left-[62.5%] w-px bg-zinc-800 border-l border-dashed border-zinc-700/50"></div>
+<div class="absolute top-0 bottom-0 left-[87.5%] w-px bg-zinc-800 border-l border-dashed border-zinc-700/50"></div>
+<div class="relative w-full h-12 group cursor-pointer">
+<div class="absolute left-[12.5%] w-[25%] h-px bg-zinc-500 top-1/2 group-hover:bg-zinc-300 transition-colors"></div>
+<div class="absolute left-[37.5%] top-1/2 -mt-1.5 -ml-1 border-y-4 border-y-transparent border-l-[6px] border-l-zinc-500 group-hover:border-l-zinc-300"></div>
+<div class="absolute left-[25%] top-1 -translate-x-1/2 text-[10px] font-mono text-zinc-400 group-hover:text-zinc-200 bg-[#0a0a0a] px-1">REGISTER (1)</div>
+</div>
+<div class="relative w-full h-12 cursor-pointer bg-[#FF6B00]/5 border-y border-[#FF6B00]/20 z-10">
+<div class="absolute left-[12.5%] w-[25%] h-px bg-[#FF6B00] top-1/2 shadow-[0_0_8px_rgba(255,107,0,0.8)]"></div>
+<div class="absolute left-[12.5%] top-1/2 -mt-1.5 ml-1 border-y-4 border-y-transparent border-r-[6px] border-r-[#FF6B00]"></div>
+<div class="absolute left-[25%] top-1 -translate-x-1/2 text-[10px] font-mono font-bold text-[#FF6B00] bg-[#0a0a0a] px-2 py-0.5 rounded-sm border border-[#FF6B00]/30 shadow-[0_0_10px_rgba(255,107,0,0.2)]">401 Unauthorized (2)</div>
+</div>
+<div class="relative w-full h-12 group cursor-pointer mt-2">
+<div class="absolute left-[12.5%] w-[50%] h-px bg-zinc-500 top-1/2 group-hover:bg-zinc-300 transition-colors"></div>
+<div class="absolute left-[62.5%] top-1/2 -mt-1.5 -ml-1 border-y-4 border-y-transparent border-l-[6px] border-l-zinc-500 group-hover:border-l-zinc-300"></div>
+<div class="absolute left-[37.5%] top-1 -translate-x-1/2 text-[10px] font-mono text-zinc-400 group-hover:text-zinc-200 bg-[#0a0a0a] px-1">REGISTER (Auth) (3)</div>
+</div>
+<div class="relative w-full h-12 group cursor-pointer">
+<div class="absolute left-[62.5%] w-[25%] h-px bg-blue-500/50 top-1/2"></div>
+<div class="absolute left-[87.5%] top-1/2 -mt-1.5 -ml-1 border-y-4 border-y-transparent border-l-[6px] border-l-blue-500/50"></div>
+<div class="absolute left-[75%] top-1 -translate-x-1/2 text-[10px] font-mono text-blue-400/80 bg-[#0a0a0a] px-1">MAR (4)</div>
+</div>
+<div class="relative w-full h-12 group cursor-pointer">
+<div class="absolute left-[62.5%] w-[25%] h-px bg-blue-500/50 top-1/2"></div>
+<div class="absolute left-[62.5%] top-1/2 -mt-1.5 ml-1 border-y-4 border-y-transparent border-r-[6px] border-r-blue-500/50"></div>
+<div class="absolute left-[75%] top-1 -translate-x-1/2 text-[10px] font-mono text-blue-400/80 bg-[#0a0a0a] px-1">MAA (5)</div>
+</div>
+<div class="relative w-full h-12 group cursor-pointer">
+<div class="absolute left-[37.5%] w-[25%] h-px bg-emerald-500/70 top-1/2"></div>
+<div class="absolute left-[37.5%] top-1/2 -mt-1.5 ml-1 border-y-4 border-y-transparent border-r-[6px] border-r-emerald-500/70"></div>
+<div class="absolute left-[50%] top-1 -translate-x-1/2 text-[10px] font-mono text-emerald-400 bg-[#0a0a0a] px-1">200 OK (6)</div>
+</div>
+<div class="relative w-full h-12 group cursor-pointer">
+<div class="absolute left-[12.5%] w-[25%] h-px bg-emerald-500/70 top-1/2"></div>
+<div class="absolute left-[12.5%] top-1/2 -mt-1.5 ml-1 border-y-4 border-y-transparent border-r-[6px] border-r-emerald-500/70"></div>
+<div class="absolute left-[25%] top-1 -translate-x-1/2 text-[10px] font-mono text-emerald-400 bg-[#0a0a0a] px-1">200 OK (7)</div>
+</div>
+</div>
+</div>
+<div class="flex-1 flex gap-3 overflow-hidden h-[40%]">
+<div class="w-2/5 bg-[#0a0a0a] border border-zinc-800/80 rounded-sm overflow-auto flex flex-col">
+<div class="bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-between sticky top-0">
+<span class="text-[10px] font-headline uppercase tracking-widest text-zinc-400">Packet Dissector</span>
+<span class="text-[9px] font-mono text-zinc-500">Frame 843</span>
+</div>
+<div class="p-2 font-mono text-xs text-zinc-300 flex flex-col">
+<div class="flex items-start gap-1 py-1 hover:bg-zinc-800/50 rounded px-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px] text-zinc-500">arrow_right</span>
+<span>Frame 843: 615 bytes on wire (4920 bits), 615 bytes captured</span>
+</div>
+<div class="flex items-start gap-1 py-1 hover:bg-zinc-800/50 rounded px-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px] text-zinc-500">arrow_right</span>
+<span>Ethernet II, Src: Vmware_c0:ff:ee (00:50:56:c0:ff:ee), Dst: Cisco_12:34:56</span>
+</div>
+<div class="flex items-start gap-1 py-1 hover:bg-zinc-800/50 rounded px-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px] text-zinc-500">arrow_right</span>
+<span>Internet Protocol Version 4, Src: 10.4.128.21, Dst: 172.24.0.46</span>
+</div>
+<div class="flex items-start gap-1 py-1 hover:bg-zinc-800/50 rounded px-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px] text-zinc-500">arrow_right</span>
+<span>User Datagram Protocol, Src Port: 5060, Dst Port: 5060</span>
+</div>
+<div class="flex flex-col bg-[#FF6B00]/10 border-l-2 border-[#FF6B00] py-1 rounded-r px-1 mt-1">
+<div class="flex items-start gap-1 cursor-pointer">
+<span class="material-symbols-outlined text-[14px] text-[#FF6B00]">arrow_drop_down</span>
+<span class="text-[#FF6B00] font-bold">Session Initiation Protocol (401)</span>
+</div>
+<div class="ml-5 flex flex-col gap-0.5 mt-1 border-l border-zinc-700/50 pl-2">
+<div class="hover:bg-zinc-800/80 px-1 rounded">Status-Line: SIP/2.0 401 Unauthorized</div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">Via: SIP/2.0/UDP 172.24.0.46:5060;branch=z9hG4bK...</div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">From: <sip:user@traceiq.net>;tag=12345</sip:user@traceiq.net></div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">To: <sip:user@traceiq.net>;tag=67890</sip:user@traceiq.net></div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">Call-ID: 987654321@172.24.0.46</div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">CSeq: 1 REGISTER</div>
+<div class="hover:bg-zinc-800/80 px-1 rounded bg-[#FF6B00]/20 text-white font-semibold">WWW-Authenticate: Digest realm="traceiq.net", nonce="...</div>
+<div class="hover:bg-zinc-800/80 px-1 rounded">Content-Length: 0</div>
+</div>
+</div>
+</div>
+</div>
+<div class="w-3/5 bg-[#0a0a0a] border border-zinc-800/80 rounded-sm overflow-hidden flex flex-col">
+<div class="bg-zinc-900/50 border-b border-zinc-800 px-3 py-1.5 flex items-center justify-between sticky top-0">
+<span class="text-[10px] font-headline uppercase tracking-widest text-zinc-400">Hex Dump View</span>
+<div class="flex gap-2 text-[9px] font-mono text-zinc-600">
+<span>Offset</span>
+<span class="text-zinc-400">Hex</span>
+<span>ASCII</span>
+</div>
+</div>
+<div class="p-3 font-mono text-[11px] leading-relaxed overflow-auto flex gap-4 selection:bg-[#FF6B00]/40">
+<div class="text-zinc-600 select-none text-right">
+                            0000<br/>0010<br/>0020<br/>0030<br/>0040<br/>0050<br/>0060<br/>0070<br/>0080<br/>0090<br/>00a0<br/>00b0<br/>00c0<br/>00d0<br/>00e0<br/>00f0
+                        </div>
+<div class="text-zinc-300 tracking-widest">
+                            00 50 56 c0 ff ee 00 0c 29 12 34 56 08 00 45 00<br/>
+                            02 57 1a 2b 40 00 40 11 a1 b2 0a 04 80 15 ac 18<br/>
+                            00 2e 13 c4 13 c4 02 43 00 00 53 49 50 2f 32 2e<br/>
+                            30 20 34 30 31 20 55 6e 61 75 74 68 6f 72 69 7a<br/>
+                            65 64 0d 0a 56 69 61 3a 20 53 49 50 2f 32 2e 30<br/>
+                            2f 55 44 50 20 31 37 32 2e 32 34 2e 30 2e 34 36<br/>
+                            3a 35 30 36 30 3b 62 72 61 6e 63 68 3d 7a 39 68<br/>
+                            47 34 62 4b 31 32 33 0d 0a 46 72 6f 6d 3a 20 3c<br/>
+                            73 69 70 3a 75 73 65 72 40 74 72 61 63 65 69 71<br/>
+                            2e 6e 65 74 3e 3b 74 61 67 3d 31 32 33 34 35 0d<br/>
+                            0a 54 6f 3a 20 3c 73 69 70 3a 75 73 65 72 40 74<br/>
+                            72 61 63 65 69 71 2e 6e 65 74 3e 3b 74 61 67 3d<br/>
+                            36 37 38 39 30 0d 0a 43 61 6c 6c 2d 49 44 3a 20<br/>
+<span class="bg-[#FF6B00]/30 text-[#FF6B00] px-0.5 rounded-sm shadow-[0_0_5px_rgba(255,107,0,0.5)]">57 57 57 2d 41 75 74 68 65 6e 74 69 63 61 74 65</span><br/>
+<span class="bg-[#FF6B00]/30 text-[#FF6B00] px-0.5 rounded-sm shadow-[0_0_5px_rgba(255,107,0,0.5)]">3a 20 44 69 67 65 73 74 20 72 65 61 6c 6d 3d 22</span><br/>
+<span class="bg-[#FF6B00]/30 text-[#FF6B00] px-0.5 rounded-sm shadow-[0_0_5px_rgba(255,107,0,0.5)]">74 72 61 63 65 69 71 2e 6e 65 74 22 2c 20 6e 6f</span>
+</div>
+<div class="text-zinc-500 whitespace-pre">
+.PV.....).4V..E.
+.W.+@.@.........
+.......C..SIP/2.
+0 401 Unauthoriz
+ed..Via: SIP/2.0
+/UDP 172.24.0.46
+:5060;branch=z9h
+G4bK123..From: &lt;
+sip:user@traceiq
+.net&gt;;tag=12345.
+.To: &lt;sip:user@t
+raceiq.net&gt;;tag=
+67890..Call-ID: 
+<span class="text-[#FF6B00] font-bold drop-shadow-[0_0_2px_rgba(255,107,0,0.8)]">WWW-Authenticate</span>
+<span class="text-[#FF6B00] font-bold drop-shadow-[0_0_2px_rgba(255,107,0,0.8)]">: Digest realm="</span>
+<span class="text-[#FF6B00] font-bold drop-shadow-[0_0_2px_rgba(255,107,0,0.8)]">traceiq.net", no</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<footer class="bg-black/90 text-[#FF6B00] font-label text-[10px] uppercase fixed bottom-0 w-full h-8 flex justify-between items-center px-4 backdrop-blur-md z-50 border-t border-[#FF6B00]/30">
+<div class="flex items-center gap-4">
+<span class="text-zinc-500">TraceIQ Engine v2.4.0 | Status: <span class="text-emerald-500">Connected</span></span>
+<div class="h-3 w-px bg-zinc-700"></div>
+<span class="text-zinc-300 font-mono">1,071 packets loaded</span>
+<span class="text-zinc-500 font-mono">Mem: 142MB / 4GB</span>
+</div>
+<div class="flex gap-4">
+<a class="text-zinc-500 hover:text-white transition-colors" href="#">Privacy</a>
+<a class="text-zinc-500 hover:text-white transition-colors" href="#">Security</a>
+<a class="text-zinc-500 hover:text-white transition-colors" href="#">Documentation</a>
+</div>
+</footer>
+</body></html>

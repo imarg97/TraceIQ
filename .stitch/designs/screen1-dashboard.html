@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TraceIQ Analysis Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container": "#1f1f1f",
+                        "on-primary-container": "#572000",
+                        "tertiary-container": "#059eff",
+                        "tertiary": "#9ccaff",
+                        "surface-dim": "#131313",
+                        "surface-container-low": "#1b1b1b",
+                        "secondary": "#f9b98f",
+                        "on-secondary-container": "#e5a87f",
+                        "on-tertiary-fixed": "#001d35",
+                        "surface-bright": "#393939",
+                        "secondary-fixed-dim": "#f9b98f",
+                        "secondary-fixed": "#ffdcc6",
+                        "primary-fixed": "#ffdbcc",
+                        "on-tertiary-container": "#003357",
+                        "tertiary-fixed-dim": "#9ccaff",
+                        "danger-red": "#FF3B30",
+                        "error": "#ffb4ab",
+                        "primary-fixed-dim": "#ffb693",
+                        "surface-variant": "#353535",
+                        "on-background": "#e2e2e2",
+                        "on-primary-fixed": "#351000",
+                        "inverse-primary": "#a04100",
+                        "trace-glow": "#FF8533",
+                        "error-container": "#93000a",
+                        "outline": "#a98a7d",
+                        "on-error": "#690005",
+                        "on-secondary-fixed-variant": "#683c1c",
+                        "surface-container-high": "#2a2a2a",
+                        "surface-active": "rgba(255, 107, 0, 0.08)",
+                        "surface": "#131313",
+                        "on-surface-variant": "#e2bfb0",
+                        "outline-variant": "#5a4136",
+                        "background": "#131313",
+                        "inverse-on-surface": "#303030",
+                        "on-surface": "#e2e2e2",
+                        "on-tertiary": "#003257",
+                        "success-green": "#32D74B",
+                        "primary": "#ffb693",
+                        "surface-container-highest": "#353535",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#00497b",
+                        "surface-tint": "#ffb693",
+                        "on-primary": "#561f00",
+                        "surface-container-lowest": "#0e0e0e",
+                        "primary-container": "#ff6b00",
+                        "on-secondary-fixed": "#311300",
+                        "on-primary-fixed-variant": "#7a3000",
+                        "tertiary-fixed": "#d0e4ff",
+                        "border-muted": "#1A0B00",
+                        "secondary-container": "#683c1c",
+                        "inverse-surface": "#e2e2e2",
+                        "on-secondary": "#4d2608"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-max": "1440px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["JetBrains Mono"],
+                        "label-md": ["Hanken Grotesk"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "label-sm": ["Hanken Grotesk"],
+                        "body-md": ["JetBrains Mono"],
+                        "body-sm": ["JetBrains Mono"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "headline-sm": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "letterSpacing": "0.1em", "fontWeight": "600" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "body-sm": ["12px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #000000; color: #e2e2e2; }
+        .glow-active { box-shadow: 0 0 8px rgba(255, 107, 0, 0.4); }
+        .border-brand-primary { border-color: #FF6B00; }
+        .bg-brand-primary { background-color: #FF6B00; }
+        .text-brand-primary { color: #FF6B00; }
+        .scrollbar-custom::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scrollbar-custom::-webkit-scrollbar-track { background: #131313; }
+        .scrollbar-custom::-webkit-scrollbar-thumb { background: #FF6B00; border-radius: 4px; }
+    </style>
+</head>
+<body class="font-body-md text-body-md h-screen flex flex-col overflow-hidden">
+<!-- TopNavBar JSON Component -->
+<header class="bg-surface docked full-width top-0 border-b border-outline-variant flat no shadows flex justify-between items-center w-full px-gutter h-14 z-50 shrink-0">
+<div class="flex items-center gap-6">
+<div class="font-headline-md text-headline-md font-bold text-primary italic">TraceIQ</div>
+<nav class="hidden md:flex gap-4">
+<a class="text-primary border-b-2 border-primary pb-1 font-label-md text-label-md" href="#">Dashboard</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Explorer</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Call Flow</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Issues</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">AI</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-label-md text-label-md" href="#">Compare</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-active transition-all duration-200 active:scale-95 p-1 rounded">settings</span>
+<div class="w-8 h-8 rounded-full bg-surface-container-high border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A small, stylized avatar image of a network operator with glowing orange accents on a pure black background, cyber-ops aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCptrMTZvjxv37ry8eYsXmmnG1H5kthphJWXwMvR80Ya3vWHGxIptQ5nFYhE9yGma_rWRlZ7UXVEqFu1-7AJms32u7_LEXgIDz3kBD-78TNl7VN4rveOaRC64F71ZOflSQB6TEjcfHAAzPmKPlH3fMtrT3vOuHaYTuO4J3DFWfDRE0ZXrME1xtVbG-EygMX-u4coRb17Yu2GjNUiPHSUhVFpJR-UWkZXBGSldtjRHP0bkvFCbmeIQUFTSCBAt6muvstUXF-f81Kf24"/>
+</div>
+</div>
+</header>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+<!-- KPI Summary Row -->
+<div class="grid grid-cols-4 gap-4 shrink-0">
+<div class="bg-surface border border-brand-primary p-4 rounded flex flex-col justify-between h-24">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Total Packets</span>
+<div class="flex items-end justify-between">
+<span class="font-headline-lg text-headline-lg text-brand-primary">1,071</span>
+<div class="w-16 h-8 bg-surface-active border-b-2 border-brand-primary relative overflow-hidden">
+<!-- Simulated Sparkline -->
+<div class="absolute bottom-0 w-full h-full" style="background: linear-gradient(to top, rgba(255,107,0,0.2), transparent);"></div>
+</div>
+</div>
+</div>
+<div class="bg-surface border border-brand-primary p-4 rounded flex flex-col justify-between h-24">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Session Duration</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-brand-primary animate-pulse" style="font-variation-settings: 'FILL' 1;">radio_button_checked</span>
+<span class="font-headline-lg text-headline-lg text-brand-primary">15.1s</span>
+</div>
+</div>
+<div class="bg-surface border border-brand-primary p-4 rounded flex flex-col justify-between h-24">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Health Score</span>
+<div class="flex items-center justify-between">
+<span class="font-headline-lg text-headline-lg text-brand-primary">90/100</span>
+<div class="w-8 h-8 rounded-full border-2 border-brand-primary flex items-center justify-center">
+<div class="w-6 h-6 rounded-full bg-surface-active"></div>
+</div>
+</div>
+</div>
+<div class="bg-surface border border-brand-primary p-4 rounded flex flex-col justify-between h-24">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Protocol Mix</span>
+<div class="flex flex-col gap-1 w-full">
+<div class="flex w-full h-2 rounded overflow-hidden">
+<div class="bg-brand-primary w-[45%]" title="SIP"></div>
+<div class="bg-tertiary-container w-[30%]" title="TCP"></div>
+<div class="bg-surface-variant w-[25%]" title="Other"></div>
+</div>
+<div class="flex gap-2 font-body-sm text-body-sm text-on-surface-variant mt-1">
+<span class="text-brand-primary">SIP 45%</span>
+<span class="text-tertiary-container">TCP 30%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Filter Bar -->
+<div class="flex items-center gap-4 bg-surface p-2 border border-outline-variant rounded shrink-0">
+<div class="flex-1 relative flex items-center">
+<span class="material-symbols-outlined absolute left-2 text-on-surface-variant">search</span>
+<input class="w-full bg-black border border-brand-primary rounded pl-9 pr-2 py-1 text-on-surface focus:outline-none glow-active font-body-sm text-body-sm" placeholder="Apply display filter... (e.g. sip.Method == REGISTER)" type="text"/>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1 rounded border border-outline-variant font-label-sm text-label-sm text-on-surface-variant hover:border-brand-primary">ALL</button>
+<button class="px-3 py-1 rounded bg-surface-active border border-brand-primary font-label-sm text-label-sm text-brand-primary glow-active">SIP</button>
+<button class="px-3 py-1 rounded border border-outline-variant font-label-sm text-label-sm text-on-surface-variant hover:border-brand-primary">SCTP</button>
+<button class="px-3 py-1 rounded border border-outline-variant font-label-sm text-label-sm text-on-surface-variant hover:border-brand-primary">TCP</button>
+<button class="px-3 py-1 rounded border border-outline-variant font-label-sm text-label-sm text-on-surface-variant hover:border-brand-primary">UDP</button>
+<button class="px-3 py-1 rounded border border-outline-variant font-label-sm text-label-sm text-on-surface-variant hover:border-brand-primary">ESP</button>
+</div>
+</div>
+<!-- Main Content (Three Columns) -->
+<div class="flex-1 grid grid-cols-12 gap-4 overflow-hidden min-h-0">
+<!-- Left: Packet Table -->
+<div class="col-span-5 flex flex-col bg-surface border border-outline-variant rounded overflow-hidden">
+<div class="flex bg-surface-container-high border-b border-outline-variant p-2 font-label-sm text-label-sm text-on-surface-variant uppercase shrink-0">
+<div class="w-10">#</div>
+<div class="w-20">Time</div>
+<div class="w-32 truncate">Source</div>
+<div class="w-32 truncate">Destination</div>
+<div class="w-16">Proto</div>
+<div class="flex-1">Info</div>
+</div>
+<div class="flex-1 overflow-y-auto scrollbar-custom font-body-sm text-body-sm">
+<div class="flex items-center p-2 border-b border-[#3D1A00] hover:bg-surface-container">
+<div class="w-10 text-on-surface-variant">1</div>
+<div class="w-20 text-on-surface-variant">0.000</div>
+<div class="w-32 text-on-surface-variant truncate">192.168.1.10</div>
+<div class="w-32 text-on-surface-variant truncate">10.0.0.5</div>
+<div class="w-16"><span class="px-1 bg-surface-variant text-on-surface rounded">TCP</span></div>
+<div class="flex-1 text-on-surface truncate">5060 &gt; 5060 [SYN]</div>
+</div>
+<!-- Selected Row -->
+<div class="flex items-center p-2 border-b border-[#3D1A00] bg-surface-active border-l-2 border-l-brand-primary border-t border-t-brand-primary border-b-brand-primary border-r border-r-brand-primary">
+<div class="w-10 text-brand-primary">2</div>
+<div class="w-20 text-brand-primary">0.015</div>
+<div class="w-32 text-brand-primary truncate">192.168.1.10</div>
+<div class="w-32 text-brand-primary truncate">10.0.0.5</div>
+<div class="w-16"><span class="px-1 bg-brand-primary/20 text-brand-primary rounded border border-brand-primary">SIP</span></div>
+<div class="flex-1 text-brand-primary truncate font-bold">Request: INVITE sip:user@domain.com</div>
+</div>
+<div class="flex items-center p-2 border-b border-[#3D1A00] hover:bg-surface-container">
+<div class="w-10 text-on-surface-variant">3</div>
+<div class="w-20 text-on-surface-variant">0.030</div>
+<div class="w-32 text-on-surface-variant truncate">10.0.0.5</div>
+<div class="w-32 text-on-surface-variant truncate">192.168.1.10</div>
+<div class="w-16"><span class="px-1 bg-surface-variant text-on-surface rounded">SIP</span></div>
+<div class="flex-1 text-on-surface truncate">Status: 100 Trying</div>
+</div>
+</div>
+</div>
+<!-- Center: Packet Inspector -->
+<div class="col-span-4 flex flex-col bg-surface border border-outline-variant rounded overflow-hidden">
+<div class="p-2 border-b border-outline-variant font-label-md text-label-md bg-surface-container-high shrink-0">Packet Details (Frame 2)</div>
+<div class="flex-1 overflow-y-auto scrollbar-custom p-2 flex flex-col gap-2 font-body-sm text-body-sm">
+<!-- Tree View -->
+<div class="flex flex-col gap-1 border-b border-outline-variant pb-2">
+<div class="flex items-center gap-1 text-on-surface-variant cursor-pointer hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span> Frame 2: 846 bytes on wire
+                        </div>
+<div class="flex items-center gap-1 text-on-surface-variant cursor-pointer hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span> Ethernet II, Src: 00:11:22:33:44:55
+                        </div>
+<div class="flex items-center gap-1 text-on-surface-variant cursor-pointer hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span> Internet Protocol Version 4, Src: 192.168.1.10
+                        </div>
+<div class="flex items-center gap-1 text-on-surface-variant cursor-pointer hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span> User Datagram Protocol, Src Port: 5060
+                        </div>
+<!-- Expanded SIP -->
+<div class="flex flex-col">
+<div class="flex items-center gap-1 text-brand-primary cursor-pointer font-bold">
+<span class="material-symbols-outlined text-[16px]">expand_more</span> Session Initiation Protocol (INVITE)
+                            </div>
+<div class="ml-5 flex flex-col gap-1 pl-2 border-l border-outline-variant mt-1 text-on-surface">
+<div>Request-Line: INVITE sip:user@domain.com SIP/2.0</div>
+<div>Message Header</div>
+<div>Message Body (SDP)</div>
+</div>
+</div>
+</div>
+<!-- Raw Bytes/Header Block -->
+<div class="flex-1 bg-black p-2 rounded border border-[#3D1A00] font-body-sm text-body-sm text-on-surface-variant whitespace-pre-wrap overflow-x-auto">
+<span class="text-brand-primary">INVITE</span> sip:user@domain.com SIP/2.0
+Via: SIP/2.0/UDP 192.168.1.10:5060;branch=z9hG4bK-12345
+From: "Caller" &lt;sip:caller@domain.com&gt;;tag=abc
+To: &lt;sip:user@domain.com&gt;
+Call-ID: call-1234567890@192.168.1.10
+CSeq: 1 <span class="text-brand-primary">INVITE</span>
+Contact: &lt;sip:caller@192.168.1.10:5060&gt;
+Max-Forwards: 70
+Content-Type: application/sdp
+Content-Length: 142
+                    </div>
+</div>
+</div>
+<!-- Right: AI Panel -->
+<div class="col-span-3 flex flex-col bg-surface border border-outline-variant rounded overflow-hidden">
+<div class="p-2 border-b border-brand-primary bg-surface-container-high flex items-center gap-2 shrink-0">
+<span class="material-symbols-outlined text-brand-primary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span class="font-label-md text-label-md text-brand-primary">AI Intelligence</span>
+</div>
+<div class="flex-1 p-4 flex flex-col gap-6 overflow-y-auto scrollbar-custom">
+<div class="flex flex-col gap-2">
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase">What is happening?</div>
+<p class="font-body-sm text-body-sm text-on-surface">
+                            This is an initial <span class="text-brand-primary font-bold">SIP INVITE</span> request initiating a new call session from <code class="bg-surface-variant px-1 rounded text-xs">192.168.1.10</code>. The structure appears standard, requesting media negotiation via SDP.
+                        </p>
+</div>
+<div class="flex flex-col gap-2">
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase">Header Analysis</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 rounded bg-surface-variant border border-outline-variant font-body-sm text-body-sm text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-success-green">check_circle</span> Valid Call-ID
+                            </span>
+<span class="px-2 py-1 rounded bg-surface-variant border border-outline-variant font-body-sm text-body-sm text-on-surface flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-success-green">check_circle</span> Max-Forwards OK
+                            </span>
+<span class="px-2 py-1 rounded bg-surface-active border border-brand-primary font-body-sm text-body-sm text-brand-primary flex items-center gap-1 glow-active">
+<span class="material-symbols-outlined text-[14px]">warning</span> No Auth Header
+                            </span>
+</div>
+</div>
+<div class="flex flex-col gap-2">
+<div class="font-label-sm text-label-sm text-on-surface-variant uppercase">Body Insights (SDP)</div>
+<p class="font-body-sm text-body-sm text-on-surface">
+                            Proposing audio codec: G.711 PCMU (payload type 0). IP4 connection address aligns with origin.
+                        </p>
+</div>
+</div>
+<div class="p-3 border-t border-[#3D1A00] bg-black shrink-0 flex items-center justify-center">
+<span class="px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary text-brand-primary font-label-sm text-label-sm flex items-center gap-1 glow-active">
+<span class="material-symbols-outlined text-[14px]">verified</span> Analysis Confidence: High
+                    </span>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer JSON Component -->
+<footer class="bg-surface-container-lowest docked full-width bottom-0 border-t border-outline-variant flat no shadows fixed bottom-0 w-full z-50 flex justify-between items-center px-gutter h-8 font-label-sm text-label-sm shrink-0">
+<div class="text-on-surface-variant">ipsec_reg.pcap • Connected • 142.1k PPS</div>
+<div class="flex gap-4">
+<a class="text-on-surface-variant hover:text-primary transition-opacity duration-150" href="#">Documentation</a>
+<a class="text-on-surface-variant hover:text-primary transition-opacity duration-150" href="#">Support</a>
+</div>
+</footer>
+</body></html>

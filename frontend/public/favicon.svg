@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Minimalist Black Rounded Container -->
+  <rect width="100" height="100" rx="22" fill="#09090b" />
+
+  <!-- Clean Geometric Packet Network Topology Tree (Center) -->
+  <g stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Peak Node to Left and Right Shoulders -->
+    <line x1="50" y1="24" x2="26" y2="48" />
+    <line x1="50" y1="24" x2="74" y2="48" />
+    <line x1="50" y1="24" x2="50" y2="38" />
+
+    <!-- Left Subtree -->
+    <line x1="26" y1="48" x2="26" y2="68" />
+    <line x1="26" y1="58" x2="42" y2="58" />
+    <line x1="42" y1="48" x2="42" y2="68" />
+
+    <!-- Center Trunk -->
+    <line x1="50" y1="38" x2="50" y2="48" />
+    <line x1="50" y1="48" x2="58" y2="48" />
+    <line x1="58" y1="48" x2="58" y2="58" />
+    <line x1="58" y1="58" x2="74" y2="58" />
+
+    <!-- Right Subtree -->
+    <line x1="74" y1="48" x2="74" y2="68" />
+    <line x1="58" y1="58" x2="58" y2="68" />
+
+    <!-- Node Dots -->
+    <circle cx="50" cy="24" r="3.5" fill="#ffffff" stroke="none" />
+    <circle cx="26" cy="48" r="3" fill="#ffffff" stroke="none" />
+    <circle cx="74" cy="48" r="3" fill="#ffffff" stroke="none" />
+    <circle cx="50" cy="38" r="2.5" fill="#ffffff" stroke="none" />
+    <circle cx="50" cy="48" r="2.5" fill="#ffffff" stroke="none" />
+    <circle cx="26" cy="68" r="3.5" fill="#ffffff" stroke="none" />
+    <circle cx="42" cy="68" r="3.5" fill="#ffffff" stroke="none" />
+    <circle cx="58" cy="68" r="3.5" fill="#ffffff" stroke="none" />
+    <circle cx="74" cy="68" r="3.5" fill="#ffffff" stroke="none" />
+  </g>
+
+  <!-- Subtle Understated TCQ Subline (Bottom) -->
+  <text x="50" y="86" font-family="'Plus Jakarta Sans', 'Google Sans', sans-serif" font-size="7.5" font-weight="600" fill="#ffffff" text-anchor="middle" letter-spacing="4.5" opacity="0.9">TCQ</text>
+</svg>

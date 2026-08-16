@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased bg-slate-50 text-slate-900 dark:bg-black dark:text-slate-200 min-h-screen transition-colors duration-200;
+    font-family: 'Google Sans', 'Open Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Google Sans', 'Open Sans', sans-serif !important;
+  }
+
+  code, pre, .font-code {
+    font-family: 'JetBrains Mono', monospace !important;
+  }
+}
+
+/* Scrollbar styling for Cyber-Ops theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-ag-darkCard;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-ag-darkBorder rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-ag-primaryGlow;
+}
