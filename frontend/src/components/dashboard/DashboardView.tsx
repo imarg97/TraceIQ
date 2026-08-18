@@ -725,13 +725,13 @@ export const DashboardView: React.FC = () => {
           style={{ width: `${leftWidthPercent}%` }}
           className="flex flex-col bg-white dark:bg-ag-darkCard border border-slate-200 dark:border-ag-darkBorder rounded-xl overflow-hidden shadow-xs min-w-[280px]"
         >
-          <div className="flex bg-slate-100 dark:bg-ag-darkSurface border-b border-slate-200 dark:border-ag-darkBorder p-2.5 font-heading text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0">
-            <div className="w-10">No.</div>
-            <div className="w-20">Time</div>
-            <div className="w-28">Source</div>
-            <div className="w-28">Destination</div>
-            <div className="w-16">Proto</div>
-            <div className="flex-1">Info</div>
+          <div className="flex items-center bg-slate-100 dark:bg-ag-darkSurface border-b border-slate-200 dark:border-ag-darkBorder px-3 py-2.5 font-heading text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0 gap-2">
+            <div className="w-16 shrink-0">No.</div>
+            <div className="w-24 shrink-0">Time</div>
+            <div className="w-28 shrink-0">Source</div>
+            <div className="w-28 shrink-0">Destination</div>
+            <div className="w-14 shrink-0">Proto</div>
+            <div className="flex-1 min-w-0">Info</div>
           </div>
           <div className="flex-1 overflow-y-auto font-mono text-xs divide-y divide-slate-100 dark:divide-ag-darkBorder/40">
             {paginatedPackets.map((pkt) => {
@@ -743,17 +743,17 @@ export const DashboardView: React.FC = () => {
                 <div 
                   key={pkt.id || pkt.index}
                   onClick={() => setSelectedPacket(pkt)}
-                  className={`flex items-center p-2.5 cursor-pointer transition-colors ${
+                  className={`flex items-center px-3 py-2 cursor-pointer transition-colors gap-2 ${
                     isSelected 
                       ? 'bg-ag-primary/10 border-l-4 border-l-ag-primary text-slate-900 dark:text-slate-100 font-medium' 
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <div className="w-10 font-bold text-slate-500">{pkt.index}</div>
-                  <div className="w-20 text-slate-500 dark:text-slate-400 text-[11px]">{pkt.timestamp_str || pkt.time.toFixed(3)}</div>
-                  <div className="w-28 truncate" title={pkt.source}>{pkt.source}</div>
-                  <div className="w-28 truncate" title={pkt.destination}>{pkt.destination}</div>
-                  <div className="w-16">
+                  <div className="w-16 shrink-0 font-bold text-slate-600 dark:text-slate-400 text-[11px]">{pkt.index}</div>
+                  <div className="w-24 shrink-0 text-slate-500 dark:text-slate-400 text-[11px] font-mono">{pkt.timestamp_str || pkt.time.toFixed(3)}</div>
+                  <div className="w-28 shrink-0 truncate text-[11px]" title={pkt.source}>{pkt.source}</div>
+                  <div className="w-28 shrink-0 truncate text-[11px]" title={pkt.destination}>{pkt.destination}</div>
+                  <div className="w-14 shrink-0">
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                       pkt.protocol === 'SIP' 
                         ? 'bg-ag-primary/20 text-ag-primary border border-ag-primary/40' 
@@ -762,7 +762,7 @@ export const DashboardView: React.FC = () => {
                       {pkt.protocol}
                     </span>
                   </div>
-                  <div className={`flex-1 truncate text-xs ${
+                  <div className={`flex-1 min-w-0 truncate text-[11px] ${
                     isError ? 'text-rose-600 dark:text-rose-400 font-bold' : (is200 ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : '')
                   }`} title={pkt.info}>
                     {pkt.info}

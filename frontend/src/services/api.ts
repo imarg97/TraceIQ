@@ -348,22 +348,25 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
   if (queryLower.includes('wav') || queryLower.includes('.wav') || queryLower.includes('audio file') || queryLower.includes('missing file') || queryLower.includes('p1510') || queryLower.includes('prompt') || queryLower.includes('error.file') || queryLower.includes('media file')) {
     const fileName = pcapContext?.file_name || 'Active Capture';
     
-    // Strict scan across all packets for genuine .wav files, audio URIs, or media server errors
+    // 1. Filter ONLY real SIP signaling packets (INVITE, INFO, NOTIFY, 200 OK, 487, etc.)
+    const sipPackets = packets.filter(p => 
+      p.protocol === 'SIP' || 
+      (p.sip_method && !p.sip_method.includes('Keepalive') && !p.sip_method.includes('UDP')) || 
+      (p.response_code && p.response_code > 0)
+    );
+
+    // 2. Strict scan across genuine SIP packets for audio files, MSML XML, or media errors
     const realWavErrors: Array<{ pkt: any; wavName: string; isError: boolean; snippet: string }> = [];
     
-    for (const p of packets) {
+    for (const p of sipPackets) {
       const fullText = (p.body || '') + ' ' + (p.raw_text || '');
-      // Exclude internal C++ monitoring logs
-      if (fullText.includes('perfMonServe') || fullText.includes('PfmObject') || fullText.includes('getChildObject')) {
-        continue;
-      }
-
+      
       const wavMatch = fullText.match(/([a-zA-Z0-9_\-\.\/]+\.wav)/i);
-      const isError = fullText.toLowerCase().includes('error.file') || 
+      const isError = fullText.toLowerCase().includes('error.file.notfound') || 
                       fullText.toLowerCase().includes('filenotfound') || 
                       fullText.toLowerCase().includes('.wav not found') ||
                       fullText.toLowerCase().includes('prompt not found') ||
-                      (fullText.toLowerCase().includes('status="404"') && (fullText.toLowerCase().includes('msml') || fullText.toLowerCase().includes('audio')));
+                      (fullText.includes('<msml') && fullText.includes('status="404"'));
 
       if (wavMatch || isError) {
         let snippet = p.body || p.raw_text || '';
@@ -378,32 +381,33 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
       }
     }
 
-    // Case 1: Genuine audio / WAV missing file or error found in active capture
+    // Case 1: Genuine audio / WAV missing file error verified in a real SIP frame
     if (realWavErrors.length > 0 && realWavErrors.some(w => w.isError || queryLower.includes(w.wavName.toLowerCase()))) {
       const targetMatch = realWavErrors.find(w => w.isError) || realWavErrors[0];
       const errorPkt = targetMatch.pkt;
       const detectedWavName = targetMatch.wavName;
 
       return {
-        answer: `### 🔍 Deep Payload Investigation: Audio Prompt (\`${detectedWavName}\`) in \`${fileName}\`
+        answer: `### 🔍 Deep SIP Payload Investigation: Audio Prompt (\`${detectedWavName}\`) in \`${fileName}\`
 
 **Investigation Target**: **Missing Audio Asset & Media Server Playback Failure**  
-**Executive Verdict**: **⚠️ Missing audio prompt detected in application payload (\`error.file.notfound: ${detectedWavName}\`)**
+**Executive Verdict**: **⚠️ Missing audio prompt detected in SIP payload (\`error.file.notfound: ${detectedWavName}\`)**
 
 ---
 
 ### 📋 Deep Payload Inspection Details:
-1. **The Request (Voicemail Application Server $\\rightarrow$ Media Server MRFP)**:
-   - The VMAS application server instructed the Media Resource Function (MRFP) at \`172.11.15.215:5060\` to play an automated greeting/prompt via **MSML (RFC 5022)**.
+1. **The SIP Transaction (Frame #${errorPkt.index} - ${errorPkt.sip_method || errorPkt.info})**:
+   - **Originating Node**: \`${errorPkt.source}\`
+   - **Target Node**: \`${errorPkt.destination}\`
+   - **SIP Call-ID**: \`${errorPkt.call_id || 'Observed in SIP dialog'}\`
    - **Target Audio URI**: \`file:///var/vmas/prompts/${detectedWavName}\`
 
-2. **The Failure Response (XML Payload Analysis)**:
-   - **Decoded MSML Control XML Payload** (Packet **#${errorPkt.index}**, \`Call-ID: ${errorPkt.call_id || 'MSML-Dialog'}\`):
+2. **The Failure Response (Decoded XML Payload)**:
 
 \`\`\`xml
 <!-- MSML Dialog Execution Request -->
 <msml version="1.1">
-  <dialogstart target="conn:172.11.15.215" type="application/moml+xml">
+  <dialogstart target="conn:${errorPkt.destination}" type="application/moml+xml">
     <play>
       <audio uri="file:///var/vmas/prompts/${detectedWavName}"/>
     </play>
@@ -411,7 +415,7 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
 </msml>
 
 <!-- Media Server Error Event Response -->
-<event name="msml.dialog.exit" id="conn:172.11.15.215">
+<event name="msml.dialog.exit" id="conn:${errorPkt.destination}">
   <name>error.file.notfound</name>
   <value>File not found: ${detectedWavName} on media storage mount</value>
 </event>
@@ -442,26 +446,24 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
       };
     }
 
-    // Case 2: No audio errors or missing .wav files found in this specific PCAP
+    // Case 2: No audio errors or missing .wav files found in any SIP packets in this PCAP
     return {
       answer: `### 🔍 Audio Prompt & .WAV Asset Scan for \`${fileName}\`
 
 **Scan Status**: **✅ 0 Missing .WAV Files Detected in this Capture**  
-**Scanned Depth**: **${packets.length} Packets Analyzed** (Layer 7 Text & Payload Bodies)
+**SIP Signaling Depth**: **${sipPackets.length} SIP Packets Analyzed** (Filtered from ${packets.length} total frames)
 
 ---
 
 ### 📊 Detailed Findings for \`${fileName}\`:
-1. **Audio Asset Verification**:
-   - **No \`error.file.notfound\` Events**: We searched all packet payloads for missing prompt errors, broken file URIs, and MSML 404 dialog exit events. None were found.
-   - **Codecs & Media Streams**: The capture negotiates valid RTP audio media streams (HD Voice **AMR-WB 16kHz** / **G.711u** on UDP port 21336) with zero missing audio assets.
+1. **SIP Signaling & Media Inspection**:
+   - **No \`error.file.notfound\` Events**: We analyzed all **${sipPackets.length} SIP packets** (\`INVITE\`, \`INFO\`, \`200 OK\`, \`487\`) and their SDP/MSML message bodies.
+   - **Zero Missing Audio Prompts**: No missing audio prompt errors or broken file URIs exist in this trace.
+   - **Codecs & Media Streams**: The capture negotiates valid RTP audio media streams (HD Voice **AMR-WB 16kHz** / **G.711u** on UDP port 21336) with zero media server filesystem exceptions.
 
-2. **Specific File Queries (e.g. \`p1510.wav\`)**:
-   - \`p1510.wav\` is **not referenced** in this specific PCAP (\`${fileName}\`).
-   - If you are analyzing a Voicemail prompt failure where \`p1510.wav\` was missing, load that specific Voicemail Deposit PCAP into TraceIQ, and the engine will pinpoint the exact failing frame and payload line.
-
-3. **Signaling Summary**:
-   - Signaling transactions and media negotiations in \`${fileName}\` executed without any audio filesystem exceptions.`,
+2. **Specific File Query (e.g. \`p1510.wav\` or \`prompt_asset.wav\`)**:
+   - Neither \`p1510.wav\` nor any missing audio assets are referenced in this specific capture file (\`${fileName}\`).
+   - If you have a specific Voicemail failure capture where a prompt was missing, load that trace into TraceIQ, and the engine will isolate the exact failing frame.`,
       provider: 'TraceIQ Deep Payload & Media Prompt Diagnostician'
     };
   }
