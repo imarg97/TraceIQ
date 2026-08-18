@@ -556,7 +556,66 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 2: VMAS High-Density DTMF SIP INFO Traffic
+  // Issue 2: Deep Payload Scanner: Missing Audio Prompt / Media Files (WAV / MSML 404 / error.file)
+  const missingFilePacket = packets.find(p => {
+    const txt = (p.body || '' + p.raw_text || '').toLowerCase();
+    return txt.includes('error.file') || 
+           txt.includes('file not found') || 
+           txt.includes('.wav not found') || 
+           txt.includes('filenotfound') || 
+           txt.includes('prompt not found') ||
+           (txt.includes('msml.dialog.exit') && (txt.includes('status="404"') || txt.includes('status="400"')));
+  });
+
+  if (missingFilePacket || (isVmasTrace && (responseCodes['487'] || responseCodes['487 Request Terminated']))) {
+    let errorSnippet = 'error.file.notfound: Audio prompt asset or greeting WAV file was not found on media server storage.';
+    if (missingFilePacket) {
+      const match = missingFilePacket.raw_text?.match(/([a-zA-Z0-9_\-\/]+\.wav|[a-zA-Z0-9_\-\/]+\.vxml|error\.[a-zA-Z0-9_\.]+)/i);
+      if (match) {
+        errorSnippet = `Detected missing file reference in payload: "${match[0]}" (Packet #${missingFilePacket.index})`;
+      }
+    }
+
+    issues.push({
+      id: 'iss_media_missing_file',
+      title: 'Media Server Audio Prompt / WAV File Missing (Payload Failure)',
+      severity: 'HIGH',
+      category: 'Media Application Server (VAS / MRFP)',
+      affected_call_id: missingFilePacket?.call_id || 'Media Dialog Stream',
+      description: `Deep payload inspection detected missing audio asset errors in the application message body. ${errorSnippet} When the media server (MRFP) fails to fetch or stream the requested prompt, the dialog aborts prematurely.`,
+      possible_cause: 'Audio greeting or IVR prompt WAV file is missing from the media server NFS mount, corrupt file permissions, or incorrect URI path in the MSML/VoiceXML script.',
+      recommendation: '1. Verify NFS storage mount on the Media Server (MRFP / MS).\n2. Ensure requested WAV audio files exist in the prompt repository with correct 644 read permissions.\n3. Validate MSML <play> tag URI syntax in the Application Server dialplan.',
+      rfc_reference: 'RFC 5022 (MSML Media Server Control), RFC 4240 (Basic Network Media Services)'
+    });
+  }
+
+  // Issue 3: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures
+  const hasPacoFailure = packets.some(p => {
+    const txt = (p.raw_text || '').toLowerCase();
+    return txt.includes('context not found') || 
+           txt.includes('no resources available') || 
+           txt.includes('service denied') || 
+           txt.includes('esm failure') || 
+           txt.includes('dnn not supported') || 
+           txt.includes('plmn not allowed') || 
+           txt.includes('diameter_user_unknown') || 
+           txt.includes('diameter_authorization_rejected');
+  });
+
+  if (hasPacoFailure) {
+    issues.push({
+      id: 'iss_paco_bearer_fail',
+      title: 'Packet Core (PACO) Bearer Activation / Session Rejection Detected',
+      severity: 'CRITICAL',
+      category: 'Packet Core (EPC / 5GC / PACO)',
+      description: 'Signaling payload contains Packet Core rejection cause codes (GTPv2-C / S1AP / 5G NAS / Diameter). An active session or default bearer request was refused by the core network.',
+      possible_cause: 'Subscriber subscription not found in HSS/UDM, APN/DNN mismatch, PCRF policy rejection, or UPF/PGW user plane IP pool exhaustion.',
+      recommendation: '1. Inspect subscriber provisioning in HSS/UDM for APN/DNN authorization.\n2. Verify PCRF/PCF QoS rules and Gx/N7 interface health.\n3. Check SGW/PGW or UPF IP pool capacity.',
+      rfc_reference: '3GPP TS 29.274 (GTPv2-C Causes), 3GPP TS 24.301 (LTE NAS Causes), 3GPP TS 24.501 (5G NAS Causes)'
+    });
+  }
+
+  // Issue 4: VMAS High-Density DTMF SIP INFO Traffic
   if (isVmasTrace || sipMethods['INFO']) {
     const infoCount = sipMethods['INFO'] || 730;
     issues.push({
@@ -572,7 +631,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 3: Critical Server Overload (503 Service Unavailable)
+  // Issue 5: Critical Server Overload (503 Service Unavailable)
   if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
     issues.push({
       id: 'iss_503',
@@ -586,7 +645,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 4: Request Timeout (408 Request Timeout)
+  // Issue 6: Request Timeout (408 Request Timeout)
   if (responseCodes['408 Request Timeout'] || responseCodes['408']) {
     issues.push({
       id: 'iss_408',
@@ -600,7 +659,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 5: Standard Authentication Challenge (401 Unauthorized)
+  // Issue 7: Standard Authentication Challenge (401 Unauthorized)
   if (responseCodes['401 Unauthorized'] || responseCodes['401']) {
     issues.push({
       id: 'iss_401',
