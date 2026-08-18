@@ -527,6 +527,12 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
 
   const durationSec = Math.max(0.05, lastTimestamp - firstTimestamp);
 
+  // Recalculate accurate final protocol counts from all packets
+  const finalProtocolCounts: { [key: string]: number } = {};
+  for (const p of packets) {
+    finalProtocolCounts[p.protocol] = (finalProtocolCounts[p.protocol] || 0) + 1;
+  }
+
   const issues: IssueEngineItem[] = [];
   if (responseCodes['401 Unauthorized']) {
     issues.push({
@@ -553,7 +559,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     capture_start_time: packets[0]?.timestamp_str || '00:00:00.000',
     capture_end_time: packets[packets.length - 1]?.timestamp_str || '00:00:00.000',
     avg_call_duration_sec: Number(durationSec.toFixed(1)),
-    protocol_distribution: protocolCounts,
+    protocol_distribution: finalProtocolCounts,
     top_response_codes: responseCodes,
     top_sip_methods: sipMethods,
     packets,
