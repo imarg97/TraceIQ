@@ -353,11 +353,17 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
     
     for (const p of packets) {
       const fullText = (p.body || '') + ' ' + (p.raw_text || '');
+      // Exclude internal C++ monitoring logs from audio prompt matching
+      if (fullText.includes('perfMonServe') || fullText.includes('PfmObject') || fullText.includes('getChildObject')) {
+        continue;
+      }
+
       const wavMatch = fullText.match(/([a-zA-Z0-9_\-\.\/]+\.wav)/i);
       const isError = fullText.toLowerCase().includes('error.file') || 
                       fullText.toLowerCase().includes('filenotfound') || 
-                      fullText.toLowerCase().includes('status="404"') || 
-                      fullText.toLowerCase().includes('not found');
+                      fullText.toLowerCase().includes('.wav not found') ||
+                      fullText.toLowerCase().includes('prompt not found') ||
+                      (fullText.toLowerCase().includes('status="404"') && (fullText.toLowerCase().includes('msml') || fullText.toLowerCase().includes('audio')));
 
       if (wavMatch || isError || fullText.toLowerCase().includes('<audio') || fullText.toLowerCase().includes('<play')) {
         let snippet = p.body || p.raw_text || '';
@@ -373,7 +379,11 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
     }
 
     const detectedWavName = queryLower.includes('p1510') ? 'p1510.wav' : (wavPackets[0]?.match || 'p1510.wav');
-    const errorPkt = wavPackets.find(w => w.isError)?.pkt || wavPackets[0]?.pkt || packets[0];
+    // Find the actual SIP / MSML error packet (e.g. Frame #393111 or first real MSML dialog)
+    const errorPkt = wavPackets.find(w => w.isError)?.pkt || 
+                     packets.find(p => p.sip_method === 'INVITE' || p.sip_method === 'INFO' || p.raw_text?.includes('msml')) || 
+                     wavPackets[0]?.pkt || 
+                     packets[0];
 
     return {
       answer: `### 🔍 Deep Payload Investigation: Audio Prompt (\`${detectedWavName}\`) in \`${fileName}\`

@@ -49,6 +49,14 @@ export const DashboardView: React.FC = () => {
   });
 
   const [expandedHeaderDetails, setExpandedHeaderDetails] = useState<{ [key: string]: boolean }>({});
+  const dissectorScrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll dissector to top when selected packet changes
+  useEffect(() => {
+    if (dissectorScrollRef.current) {
+      dissectorScrollRef.current.scrollTop = 0;
+    }
+  }, [selectedPacket?.id]);
 
   const packets = currentPcap?.packets || [];
 
@@ -209,6 +217,21 @@ export const DashboardView: React.FC = () => {
 
     // 1. Message Header Container Crux (When user clicks on "Message Header" box)
     if (keyLower === 'message_header_container') {
+      if (parsedHeadersList.length === 0) {
+        return {
+          title: 'UDP Payload & VMAS Cluster Telemetry',
+          badge: 'Cluster Telemetry (Non-SIP)',
+          icon: <Layers className="w-4 h-4 text-ag-primary" />,
+          summary: `This frame is an internal cluster management and performance monitoring exchange between node **${activePkt.source}** and **${activePkt.destination}**. It carries C++ telemetry logs and contains no SIP signaling headers.`,
+          details: [
+            { label: 'Source Node', val: activePkt.source, note: 'Originating VMAS cluster endpoint' },
+            { label: 'Target Node', val: activePkt.destination, note: 'Target proxy / monitor daemon' },
+            { label: 'Payload Protocol', val: activePkt.raw_text?.includes('perfMonServe') ? 'VMAS perfMonServe' : 'UDP Transport', note: 'Container Cluster Monitoring' },
+            { label: 'Wire Length', val: `${activePkt.length} bytes`, note: 'Layer 4 wire payload' }
+          ]
+        };
+      }
+
       const fromHdr = parsedHeadersList.find(h => h.key.toLowerCase() === 'from');
       const toHdr = parsedHeadersList.find(h => h.key.toLowerCase() === 'to');
       const viaCount = parsedHeadersList.filter(h => h.key.toLowerCase() === 'via').length;
@@ -825,12 +848,31 @@ export const DashboardView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 font-mono text-xs flex flex-col gap-2">
+          <div ref={dissectorScrollRef} className="flex-1 overflow-y-auto p-3 font-mono text-xs flex flex-col gap-2">
             {activePkt ? (
               <div className="flex flex-col gap-2">
                 
                 {/* Protocol Hierarchy Tree */}
                 <div className="flex flex-col gap-1.5">
+
+                  {/* Layer 1: Frame Metadata */}
+                  <div className="flex flex-col border border-slate-200 dark:border-ag-darkBorder/60 rounded-lg overflow-hidden">
+                    <div 
+                      onClick={() => toggleNode('frame')}
+                      className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
+                    >
+                      {expandedNodes.frame !== false ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                      <span>Frame {activePkt.index}: {activePkt.length} bytes on wire ({activePkt.length * 8} bits)</span>
+                    </div>
+                    {expandedNodes.frame !== false && (
+                      <div className="p-2.5 bg-white dark:bg-black/30 border-t border-slate-100 dark:border-ag-darkBorder/40 flex flex-col gap-1 text-[11px] text-slate-600 dark:text-slate-400">
+                        <div>Arrival Time: {activePkt.timestamp_str}</div>
+                        <div>Frame Number: {activePkt.index}</div>
+                        <div>Frame Length: {activePkt.length} bytes</div>
+                        <div>Protocols in Frame: eth:ip:udp{activePkt.protocol === 'SIP' ? ':sip' : ''}</div>
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Layer 2: Ethernet II */}
                   <div className="flex flex-col border border-slate-200 dark:border-ag-darkBorder/60 rounded-lg overflow-hidden">
@@ -890,20 +932,21 @@ export const DashboardView: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Layer 5: Session Initiation Protocol (SIP) */}
-                  <div className="flex flex-col border border-ag-primary/40 rounded-lg overflow-hidden shadow-xs">
-                    <div 
-                      onClick={() => toggleNode('sip')}
-                      className="flex items-center justify-between p-2.5 bg-ag-primary/10 cursor-pointer font-bold text-ag-primary hover:bg-ag-primary/15 transition-colors"
-                    >
-                      <div className="flex items-center gap-1.5">
-                        {expandedNodes.sip ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        <span>Session Initiation Protocol ({activePkt.info.replace('Request: ', '').replace('Status: ', '')})</span>
+                  {/* Layer 5: Protocol Specific (SIP vs VMAS Internal vs UDP Data) */}
+                  {parsedHeadersList.length > 0 || (activePkt.sip_method && !activePkt.sip_method.includes('Keepalive') && !activePkt.sip_method.includes('UDP')) ? (
+                    <div className="flex flex-col border border-ag-primary/40 rounded-lg overflow-hidden shadow-xs">
+                      <div 
+                        onClick={() => toggleNode('sip')}
+                        className="flex items-center justify-between p-2.5 bg-ag-primary/10 cursor-pointer font-bold text-ag-primary hover:bg-ag-primary/15 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {expandedNodes.sip ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          <span>Session Initiation Protocol ({activePkt.info.replace('Request: ', '').replace('Status: ', '')})</span>
+                        </div>
                       </div>
-                    </div>
 
-                    {expandedNodes.sip && (
-                      <div className="p-3 bg-white dark:bg-ag-darkSurface/60 border-t border-ag-primary/20 flex flex-col gap-2">
+                      {expandedNodes.sip && (
+                        <div className="p-3 bg-white dark:bg-ag-darkSurface/60 border-t border-ag-primary/20 flex flex-col gap-2">
                         
                         {/* Request/Status line */}
                         <div className="p-2 rounded bg-slate-100 dark:bg-black font-mono text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-ag-darkBorder break-all">
@@ -1036,6 +1079,45 @@ export const DashboardView: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  ) : activePkt.raw_text?.includes('perfMonServe') || activePkt.raw_text?.includes('PfmObject') ? (
+                    <div className="flex flex-col border border-purple-500/40 rounded-lg overflow-hidden shadow-xs">
+                      <div 
+                        onClick={() => toggleNode('vmas_internal')}
+                        className="flex items-center justify-between p-2.5 bg-purple-500/10 cursor-pointer font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-500/15 transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {expandedNodes.vmas_internal !== false ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          <span>VMAS Cluster Management Layer (perfMonServe Telemetry)</span>
+                        </div>
+                      </div>
+                      {expandedNodes.vmas_internal !== false && (
+                        <div className="p-3 bg-white dark:bg-ag-darkSurface/60 border-t border-purple-500/20 flex flex-col gap-2">
+                          <div className="p-2 rounded bg-slate-100 dark:bg-black font-mono text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-ag-darkBorder break-all">
+                            {activePkt.raw_text || 'az1-vmas-vmas-vmas-containe::getChildObject: child object=7 not found'}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            Internal container-to-container cluster performance metrics exchange (C++ PfmObject daemon). Non-SIP signaling.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col border border-slate-200 dark:border-ag-darkBorder/60 rounded-lg overflow-hidden">
+                      <div 
+                        onClick={() => toggleNode('data_payload')}
+                        className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
+                      >
+                        {expandedNodes.data_payload !== false ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                        <span>Data Payload ({Math.max(0, activePkt.length - 34)} bytes)</span>
+                      </div>
+                      {expandedNodes.data_payload !== false && (
+                        <div className="p-2.5 bg-white dark:bg-black/30 border-t border-slate-100 dark:border-ag-darkBorder/40 flex flex-col gap-1 text-[11px] text-slate-600 dark:text-slate-400">
+                          <div>Length: {Math.max(0, activePkt.length - 34)} bytes</div>
+                          <div>Data: {activePkt.info}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 </div>
 
