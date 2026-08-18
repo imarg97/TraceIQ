@@ -1,4 +1,4 @@
-# TraceIQ 🚀
+# TraceIQ 
 > **Understand Every Packet. Resolve Every Issue.**
 
 TraceIQ is an AI-powered Telecom Packet Analysis and Troubleshooting Platform built specifically for **IMS**, **VoLTE**, and **Cloud-Native Telecom Engineers**.
