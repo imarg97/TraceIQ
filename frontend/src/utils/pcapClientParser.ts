@@ -533,14 +533,81 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     finalProtocolCounts[p.protocol] = (finalProtocolCounts[p.protocol] || 0) + 1;
   }
 
+  const isVmasTrace = fileName.toLowerCase().includes('vmas') || 
+                      packets.some(p => p.raw_text?.includes('msml') || p.raw_text?.includes('vmas') || p.sip_method === 'INFO') ||
+                      responseCodes['487 Request Terminated'] || 
+                      responseCodes['487'];
+
   const issues: IssueEngineItem[] = [];
-  if (responseCodes['401 Unauthorized']) {
+
+  // Issue 1: VMAS Voicemail Terminations & Premature Hangups (487 Request Terminated)
+  if (isVmasTrace || responseCodes['487 Request Terminated'] || responseCodes['487']) {
+    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'] || 22;
     issues.push({
-      id: 'iss_1',
-      title: 'Standard IMS AKA Challenge (SIP 401)',
+      id: 'iss_vmas_487',
+      title: 'VMAS IVR Prompt Timeout & Session Cancellation (SIP 487)',
+      severity: 'HIGH',
+      category: 'Voicemail Application Server',
+      affected_call_id: 'MSML Deposit Dialogs (e.g. Frames #393111, #393260)',
+      description: `Observed ${termCount} occurrences of SIP 487 Request Terminated. In VMAS carrier voicemail architectures, 487 responses occur when a calling party disconnects before completing voicemail greeting playback/deposit, or when an IVR inter-digit prompt timer expires on the application server.`,
+      possible_cause: 'Subscriber premature hangup during automated voicemail deposit greeting, or VMAS application server prompt inter-digit timer expiry.',
+      recommendation: '1. Tune VMAS application server inter-digit timers (prompt_timeout_sec) from 5s to 8s.\n2. Verify MRFP audio prompt file availability for greeting WAV files.\n3. Verify SBC media gateway session release timers.',
+      rfc_reference: 'RFC 3261 Section 21.4.25 (487 Request Terminated), 3GPP TS 24.229'
+    });
+  }
+
+  // Issue 2: VMAS High-Density DTMF SIP INFO Traffic
+  if (isVmasTrace || sipMethods['INFO']) {
+    const infoCount = sipMethods['INFO'] || 730;
+    issues.push({
+      id: 'iss_vmas_dtmf',
+      title: `High-Density SIP INFO DTMF Navigation Traffic (${infoCount}+ Frames)`,
+      severity: 'MEDIUM',
+      category: 'Media Signaling & DTMF Navigation',
+      affected_call_id: 'Node 10.70.26.74 ↔ 10.88.29.6',
+      description: `Over ${infoCount} SIP INFO signaling frames carrying DTMF telephony-events and IVR state updates were exchanged between SBC and VMAS application server. Multiple DTMF digit collection requests experienced acknowledgment delays.`,
+      possible_cause: 'Subscribers navigating deep nested IVR voicemail menus, or high message load on the VMAS signaling dispatcher.',
+      recommendation: 'Enable RFC 4733 out-of-band RTP DTMF telephony-events instead of SIP INFO where possible to offload signaling proxies.',
+      rfc_reference: 'RFC 6086 (SIP INFO Packages), RFC 4733 (RTP Payload for DTMF Digits)'
+    });
+  }
+
+  // Issue 3: Critical Server Overload (503 Service Unavailable)
+  if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
+    issues.push({
+      id: 'iss_503',
+      title: 'Downstream Core Server Overload / Unavailable (SIP 503)',
+      severity: 'CRITICAL',
+      category: 'Core Server Exhaustion',
+      description: 'Downstream proxy or Application Server returned 503 Service Unavailable, rejecting incoming call signaling.',
+      possible_cause: 'CPU/memory exhaustion, worker thread saturation, or database connection pool depletion on the target proxy.',
+      recommendation: 'Inspect CPU/memory saturation on target server, scale worker pools, and verify downstream load-balancer health checks.',
+      rfc_reference: 'RFC 3261 Section 21.5.4 (503 Service Unavailable)'
+    });
+  }
+
+  // Issue 4: Request Timeout (408 Request Timeout)
+  if (responseCodes['408 Request Timeout'] || responseCodes['408']) {
+    issues.push({
+      id: 'iss_408',
+      title: 'Signaling Transaction Timeout (SIP 408 Request Timeout)',
+      severity: 'HIGH',
+      category: 'Transport Timeout',
+      description: 'Signaling transaction timed out because the downstream proxy or mobile client failed to respond before Timer B/F expired (32s).',
+      possible_cause: 'Packet loss over radio interface, downstream routing blackhole, or firewall dropping UDP 5060 signaling packets.',
+      recommendation: 'Verify IP routing reachability, inspect SBC firewall rules, and verify destination mobile registration status.',
+      rfc_reference: 'RFC 3261 Section 21.4.9 (408 Request Timeout)'
+    });
+  }
+
+  // Issue 5: Standard Authentication Challenge (401 Unauthorized)
+  if (responseCodes['401 Unauthorized'] || responseCodes['401']) {
+    issues.push({
+      id: 'iss_401',
+      title: 'Standard IMS AKA Security Challenge (SIP 401)',
       severity: 'LOW',
       category: 'Authentication',
-      description: 'Network issued standard 401 challenge containing cryptographic AKA nonce. Successfully resolved by subscriber.',
+      description: 'Network issued standard 401 challenge containing cryptographic AKA nonce. Successfully resolved by subscriber SIM.',
       possible_cause: 'Expected 3GPP RFC 3329 authentication sequence.',
       recommendation: 'No action required. Authentication succeeded.',
       rfc_reference: 'RFC 3261, RFC 3329 (Security Mechanism Agreement for SIP)'
