@@ -585,20 +585,156 @@ The packets in this segment are **VMAS node keepalives and UDP transport frames*
     };
   }
 
-  // Broad Domain Queries: IMS Core Nodes (P-CSCF, S-CSCF, I-CSCF, HSS)
-  if (queryLower.includes('ims') || queryLower.includes('pcscf') || queryLower.includes('p-cscf') || queryLower.includes('scscf') || queryLower.includes('s-cscf') || queryLower.includes('hss') || queryLower.includes('icscf')) {
+  // Broad Domain Queries: 5G Core & Service-Based Architecture (5GC / SBI / NGAP / PFCP / 5QI)
+  if (queryLower.includes('5g') || queryLower.includes('5gc') || queryLower.includes('ngap') || queryLower.includes('pfcp') || queryLower.includes('amf') || queryLower.includes('smf') || queryLower.includes('upf') || queryLower.includes('sbi') || queryLower.includes('5qi') || queryLower.includes('nrf') || queryLower.includes('nssf')) {
     return {
-      answer: `### Telecom Domain: IMS (IP Multimedia Subsystem) Architecture
-**In plain English**: IMS is the standardized architectural framework that delivers IP multimedia services (Voice over LTE/5G, Video Calling, RCS Messaging) across telecom networks.
+      answer: `### Global Telecom Domain: 5G Core (5GC) & Service-Based Architecture
+**In plain English**: 5G Core (3GPP Release 15/16/17) transitions telecom from rigid hardware appliances to a **Cloud-Native, Microservices-driven Service Based Architecture (SBA)**.
 
-**Core Network Elements**:
-1. **P-CSCF (Proxy CSCF)**: The first contact point (Edge SBC) for the handset. Handles IPsec security associations, SIP compression (SigComp), and policing.
-2. **I-CSCF (Interrogating CSCF)**: Queries the HSS via Diameter (Cx interface) to locate which S-CSCF is assigned to serve the subscriber.
-3. **S-CSCF (Serving CSCF)**: The central session controller. Authenticates the subscriber (IMS AKA), enforces routing policies, and invokes TAS/VMAS application servers.
-4. **HSS / UDM (Home Subscriber Server / Unified Data Management)**: Master user database containing SIM cryptographic subscription profiles and service triggers (iFC).
-5. **PCRF / PCF (Policy Control)**: Dynamically requests dedicated QCI 1 voice bearers over the Rx interface when a call is answered.
-6. **MGCF / BGCF**: Breakout gateway controllers that convert SIP signaling into SS7/ISUP when calling legacy landlines/PSTN.`,
-      provider: 'TraceIQ Telecom Knowledge Base'
+**Core 5G Network Functions (NFs) & Protocols**:
+1. **Service Based Interface (SBI)**:
+   - NFs communicate using **HTTP/2 with JSON REST payloads over TLS** (e.g. \`POST /nsmf-pdusession/v1/sm-contexts\`).
+   - **NRF (Network Repository Function)**: Microservice service registry and discovery (like Consul/Kubernetes DNS for telecom).
+2. **Control & User Plane Separation (CUPS)**:
+   - **AMF (Access and Mobility Management Function)**: Handles connection and mobility management via **NGAP (N2 interface / 3GPP TS 38.413)** and 5G NAS.
+   - **SMF (Session Management Function)**: Controls PDU session establishment, IP address allocation, and UPF routing.
+   - **UPF (User Plane Function)**: High-speed packet processing and GTP-U tunneling (N3 interface) to the Data Network (N6 interface).
+   - **PFCP (Packet Forwarding Control Protocol / 3GPP TS 29.244)**: Controls UPF packet forwarding rules over the **N4 interface**.
+3. **Network Slicing (S-NSSAI)**:
+   - Enables virtualized network partitions for **eMBB** (Enhanced Mobile Broadband - SST 1), **URLLC** (Ultra-Reliable Low Latency - SST 2), and **mMTC** (Massive IoT - SST 3).
+4. **VoNR (Voice over New Radio)**:
+   - Native voice calling over 5G NR carriers utilizing **5QI 1 (GBR)** bearers and IMS integration.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: 4G LTE Evolved Packet Core (EPC / GTPv2 / S1AP / MME / SGW / PGW)
+  if (queryLower.includes('4g') || queryLower.includes('epc') || queryLower.includes('gtp') || queryLower.includes('s1ap') || queryLower.includes('mme') || queryLower.includes('sgw') || queryLower.includes('pgw') || queryLower.includes('s1-mme') || queryLower.includes('s1-u')) {
+    return {
+      answer: `### Global Telecom Domain: 4G LTE Evolved Packet Core (EPC)
+**In plain English**: The 4G EPC is an all-IP mobile core network that routes mobile subscriber data and coordinates wireless mobility between cell towers.
+
+**Key EPC Nodes & Protocol Interfaces**:
+1. **MME (Mobility Management Entity)**:
+   - The primary control node. Handles subscriber paging, authentication (with HSS via Diameter S6a), and handovers via **S1AP (S1-MME interface / 3GPP TS 36.413)**.
+2. **SGW (Serving Gateway)**:
+   - Local mobility anchor for the user data plane. Routes packet buffers during inter-eNodeB handovers via **GTP-U (S1-U / TS 29.281)**.
+3. **PGW (Packet Data Network Gateway)**:
+   - Edge interface to external networks (Internet/IMS). Enforces Quality of Service (QoS), deep packet inspection (PCEF), and per-subscriber IP allocation.
+4. **GTPv2-C (GPRS Tunneling Protocol Control / 3GPP TS 29.274)**:
+   - Used over **S11 (MME ↔ SGW)** and **S5/S8 (SGW ↔ PGW)** to create, modify, and delete subscriber GTP bearer sessions.
+5. **QoS Class Identifiers (QCI)**:
+   - **QCI 1 (GBR / 100ms budget)**: Dedicated for VoLTE Voice (RTP).
+   - **QCI 5 (Non-GBR / 100ms budget)**: Dedicated for IMS SIP Signaling.
+   - **QCI 9 (Non-GBR / 300ms budget)**: Default Internet APN data bearer.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: O-RAN & Open Fronthaul (eCPRI / CU / DU / RU / RIC)
+  if (queryLower.includes('oran') || queryLower.includes('o-ran') || queryLower.includes('ecpri') || queryLower.includes('fronthaul') || queryLower.includes('ric') || queryLower.includes('du') || queryLower.includes('cu') || queryLower.includes('ru')) {
+    return {
+      answer: `### Global Telecom Domain: Open RAN (O-RAN) & 5G Fronthaul Architecture
+**In plain English**: O-RAN disaggregates proprietary cellular base stations into standardized, open, and interoperable hardware/software components.
+
+**Key Functional Split & Elements (3GPP Split 7-2x)**:
+1. **O-RU (Open Radio Unit)**:
+   - Transmits and receives RF radio signals at the tower antenna mast.
+2. **O-DU (Open Distributed Unit)**:
+   - Executes real-time L1 PHY (Low-PHY) and L2 (MAC / RLC) scheduling.
+3. **O-CU (Open Centralized Unit)**:
+   - Disaggregated into **O-CU-CP** (Control Plane: RRC / PDCP-C) and **O-CU-UP** (User Plane: PDCP-U / SDAP).
+4. **Open Fronthaul Interface (O-RAN WG4)**:
+   - Connects O-RU to O-DU using **eCPRI (enhanced Common Public Radio Interface / IEEE 1914.3)** over 10G/25G Ethernet to transport I/Q sample user plane (U-Plane) and beamforming control (C-Plane).
+5. **RIC (RAN Intelligent Controller)**:
+   - **Near-RT RIC (E2 Interface)**: Runs AI/ML **xApps** (<1s latency) for dynamic beamforming, traffic steering, and interference mitigation.
+   - **Non-RT RIC (A1 Interface / O1)**: Runs **rApps** (>1s latency) in the SMO (Service Management and Orchestration) for global policy optimization.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: Diameter Signaling & Roaming (DRA / DEA / S6a / Gx / Gy / Ro / Rf)
+  if (queryLower.includes('diameter') || queryLower.includes('dra') || queryLower.includes('dea') || queryLower.includes('s6a') || queryLower.includes('gx') || queryLower.includes('gy') || queryLower.includes('ro') || queryLower.includes('rf')) {
+    return {
+      answer: `### Global Telecom Domain: Diameter Protocol & Carrier Roaming (RFC 6733)
+**In plain English**: Diameter is the AAA (Authentication, Authorization, Accounting) and policy protocol that powers billing, subscriber authentication, and roaming across 4G LTE and IMS.
+
+**Key Telecom Diameter Applications & Interfaces**:
+1. **S6a / S6d (MME/SGSN ↔ HSS)**:
+   - Transports subscriber authentication vectors (Authentication-Information-Request \`AIR\` / \`AIA\`) and location updates (\`ULR\` / \`ULA\`).
+2. **Gx (PCRF ↔ PGW / PCEF)**:
+   - Enforces real-time dynamic QoS rules and billing profiles based on active subscriber data plans.
+3. **Gy / Ro (PCEF/IMS ↔ OCS - Online Charging System)**:
+   - Performs real-time prepaid quota reservation via Credit-Control-Request (\`CCR\` / \`CCA\`).
+4. **Cx / Dx / Sh (CSCF/TAS ↔ HSS)**:
+   - Fetches IMS user profiles, cryptographic AKA authentication keys, and user data across IMS application servers.
+5. **DRA (Diameter Routing Agent) & DEA (Diameter Edge Agent)**:
+   - **DRA**: Central signaling router managing traffic balancing and failover inside a carrier core.
+   - **DEA**: Edge firewall/gateway securing inter-carrier roaming traffic across the **S9 / S6a** roaming interconnect.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: SS7 / SIGTRAN & Legacy Interconnect (M3UA / SCTP / ISUP / MAP / CAMEL)
+  if (queryLower.includes('ss7') || queryLower.includes('sigtran') || queryLower.includes('sctp') || queryLower.includes('m3ua') || queryLower.includes('isup') || queryLower.includes('map') || queryLower.includes('camel') || queryLower.includes('tcap')) {
+    return {
+      answer: `### Global Telecom Domain: SS7 & SIGTRAN Signaling Interconnect
+**In plain English**: SS7 (Signaling System No. 7) is the legacy global telecom signaling network. **SIGTRAN (RFC 2719 / RFC 4960)** transports SS7 messages reliably over IP networks using SCTP.
+
+**Key SIGTRAN Protocol Layers & Applications**:
+1. **SCTP (Stream Control Transmission Protocol / RFC 4960)**:
+   - Connection-oriented transport with multi-homing and multi-streaming to eliminate head-of-line blocking.
+2. **M3UA (MTP3 User Adaptation Layer / RFC 4666)**:
+   - Adapts traditional SS7 MTP3 signaling primitives to run transparently over IP/SCTP.
+3. **ISUP (ISDN User Part / ITU-T Q.763)**:
+   - Sets up and tears down voice trunks to legacy landlines and 2G/3G networks (\`IAM\` Initial Address Message $\\rightarrow$ \`ACM\` Address Complete $\\rightarrow$ \`ANM\` Answer $\\rightarrow$ \`REL\` Release $\\rightarrow$ \`RLC\` Release Complete).
+4. **MAP (Mobile Application Part)**:
+   - Transports SMS delivery (\`SendRoutingInfoForSM\`, \`ForwardSM\`), USSD codes, and 2G/3G location updates over **TCAP (Transaction Capabilities Application Part)**.
+5. **CAMEL / CAP**:
+   - Executes prepaid billing triggers and intelligent network (IN) routing before 4G/Diameter existed.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: Wi-Fi Calling & VoWiFi (ePDG / N3IWF / SWu / IKEv2 / IPsec)
+  if (queryLower.includes('vowifi') || queryLower.includes('wifi calling') || queryLower.includes('epdg') || queryLower.includes('n3iwf') || queryLower.includes('swu')) {
+    return {
+      answer: `### Global Telecom Domain: VoWiFi (Voice over Wi-Fi) & Untrusted Non-3GPP Access
+**In plain English**: VoWiFi allows mobile phones to make cellular calls and send SMS over any standard public or residential Wi-Fi network with zero cellular coverage.
+
+**Key Architectural Security & Routing**:
+1. **ePDG (Evolved Packet Data Gateway / 4G)** & **N3IWF (5G)**:
+   - Carrier edge security gateway that terminates IPsec tunnels from mobile devices over public internet.
+2. **SWu Interface & IKEv2 Handshake**:
+   - The handset initiates **IKEv2 (Internet Key Exchange v2 / RFC 7296)** towards the ePDG's public FQDN (discovered via DNS e.g. \`epdg.epc.mnc101.mcc732.pub.3gppnetwork.org\`).
+   - Authenticates using **EAP-AKA / EAP-AKA'** against the carrier HSS/AAA (SWm interface).
+3. **IPsec ESP Security Association**:
+   - A dedicated IPsec tunnel is established with AES-GCM encryption. All SIP signaling and RTP audio packets travel securely through this tunnel into the EPC PGW (S2b interface) or 5GC UPF (N3 interface).`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
+    };
+  }
+
+  // Broad Domain Queries: EVS & HD Voice Codecs (EVS / AMR-WB / G.711 / Opus)
+  if (queryLower.includes('evs') || queryLower.includes('codec') || queryLower.includes('amr-wb') || queryLower.includes('amr-nb') || queryLower.includes('opus') || queryLower.includes('g.711') || queryLower.includes('g.722') || queryLower.includes('g.729')) {
+    return {
+      answer: `### Global Telecom Domain: Telecom Audio Codecs & EVS (Enhanced Voice Services)
+**In plain English**: Audio codecs compress human speech into digital bits for wireless transmission, balancing voice clarity against radio bandwidth consumption.
+
+**Key Telecom Voice Codecs**:
+1. **EVS (Enhanced Voice Services / 3GPP TS 26.441)**:
+   - **The Gold Standard for VoLTE / 5G VoNR**:
+   - Frequency Range: **50 Hz to 20 kHz (Fullband / Superwideband)**—delivering studio-grade, lifelike voice quality.
+   - **Channel-Aware Mode**: Unmatched resilience against packet loss (up to 30% random frame loss) using built-in forward error correction.
+   - Dynamic Bitrates: Operates seamlessly from 5.9 kbps up to 128 kbps.
+2. **AMR-WB (Adaptive Multi-Rate Wideband / G.722.2)**:
+   - 16 kHz sampling (50 Hz – 7 kHz range), standard for VoLTE "HD Voice" (typically 12.65 kbps / Mode 2).
+3. **AMR-NB (Adaptive Multi-Rate Narrowband)**:
+   - 8 kHz sampling (300 Hz – 3.4 kHz range), legacy 3G/GSM codec (typically 12.2 kbps).
+4. **G.711 (PCMU / PCMA / 64 kbps)**:
+   - Uncompressed PSTN standard using $\\mu$-law (North America/Japan) or A-law (Europe/Rest of World).
+5. **RFC 4733 / RFC 2833 (DTMF Telephony Events)**:
+   - Out-of-band RTP delivery for telephone touch-tone digits (0-9, *, #, A-D) to prevent codec distortion from corrupting keypad inputs.`,
+      provider: 'TraceIQ Universal Telecom Knowledge Engine'
     };
   }
 
