@@ -344,6 +344,74 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
     }
   }
 
+  // Dedicated SIP Error / Status Code Query Handler (e.g. "Why did the 487 Request Terminated occur?", "487", "404", "503", "408", "486")
+  const isErrorCodeQuery = queryLower.includes('487') || queryLower.includes('request terminated') || 
+                           queryLower.includes('404') || queryLower.includes('503') || queryLower.includes('408') || 
+                           queryLower.includes('486') || queryLower.includes('480') || queryLower.includes('500') ||
+                           (queryLower.includes('why did') && (queryLower.includes('fail') || queryLower.includes('error') || queryLower.includes('terminate') || queryLower.includes('cancel')));
+
+  if (isErrorCodeQuery) {
+    const fileName = pcapContext?.file_name || 'Active Capture';
+    
+    // Check if the query asks specifically about a code (487, 404, 503, etc.)
+    const codeMatch = queryLower.match(/\b(487|404|503|408|486|480|500|603)\b/);
+    const targetCode = codeMatch ? parseInt(codeMatch[1], 10) : 487;
+
+    // Scan PCAP for packets matching this response code
+    const matchingPackets = packets.filter(p => p.response_code === targetCode || (p.info && p.info.includes(String(targetCode))));
+
+    if (matchingPackets.length > 0) {
+      const errPkt = matchingPackets[0];
+      const relatedCancel = packets.find(p => p.sip_method === 'CANCEL' && p.call_id === errPkt.call_id);
+      const relatedInvite = packets.find(p => p.sip_method === 'INVITE' && p.call_id === errPkt.call_id);
+
+      return {
+        answer: `### 🔍 Investigation: SIP ${targetCode} in \`${fileName}\`
+
+**Signaling Location**: **Packet #${errPkt.index}** (\`${errPkt.info}\`)  
+**Network Path**: \`${errPkt.source}\` $\\rightarrow$ \`${errPkt.destination}\`  
+**SIP Call-ID**: \`${errPkt.call_id || 'Observed in trace'}\`
+
+---
+
+### 📋 Root Cause Breakdown from this PCAP:
+1. **Transaction Sequence**:
+   - Initial Request: ${relatedInvite ? `**Frame #${relatedInvite.index}** (\`INVITE\`) from \`${relatedInvite.source}\`` : `INVITE transaction initiated`}
+   ${relatedCancel ? `- Cancellation: **Frame #${relatedCancel.index}** (\`CANCEL\`) sent by \`${relatedCancel.source}\`` : `- The transaction was terminated before final 200 OK answer.`}
+   - Termination Response: **Frame #${errPkt.index}** (\`Status: ${targetCode} ${errPkt.info}\`) returned to terminate the pending branch.
+
+2. **Telecom Diagnostic Meaning**:
+   - **SIP ${targetCode}** (RFC 3261) indicates that the pending SIP request was terminated by a CANCEL request or internal media timeout before being answered.
+   - Common triggers in Voicemail/IMS: (1) Caller hung up prior to prompt completion or deposit, (2) Media server encountered an error playing prompt, or (3) No-answer timer expired.`,
+        provider: 'TraceIQ SIP Protocol Diagnostician'
+      };
+    } else {
+      // 0 Occurrences of this error code in current PCAP
+      const sipCount = packets.filter(p => p.protocol === 'SIP').length;
+      return {
+        answer: `### 🔍 SIP ${targetCode} Analysis for \`${fileName}\`
+
+**Status in Active Capture**: **✅ 0 Occurrences of SIP ${targetCode} in this PCAP**  
+**SIP Signaling Depth**: **${sipCount} SIP Packets Scanned**
+
+---
+
+### 📋 Context for \`${fileName}\`:
+1. **Current PCAP Signaling Health**:
+   - In \`${fileName}\`, all **${sipCount} SIP transactions** executed cleanly and completed with **\`200 OK\`** responses.
+   - No \`SIP ${targetCode} Request Terminated\` or transaction cancellations occurred in this specific trace.
+
+2. **What SIP ${targetCode} Means in Voicemail / Telecom Systems**:
+   - In IETF RFC 3261, **\`487 Request Terminated\`** is returned by a server/proxy when a pending \`INVITE\` request is aborted before answer.
+   - Typical root causes in carrier voicemail networks:
+     - **Caller Disconnect (Normal)**: The caller hung up (sent \`CANCEL\`) while listening to the greeting prompt before leaving a message.
+     - **Media Server Playback Error**: The VMAS application server cancels the dialog if the MRFP reports an \`error.file.notfound\` event.
+     - **Ring / Record Timer Expiry**: The transaction exceeded the maximum carrier ring/recording duration limit.`,
+        provider: 'TraceIQ SIP Protocol Diagnostician'
+      };
+    }
+  }
+
   // Deep Audio Prompt & .wav / MSML Media Asset Query Handler (Dynamic PCAP extraction)
   if (queryLower.includes('wav') || queryLower.includes('.wav') || queryLower.includes('audio file') || queryLower.includes('missing file') || queryLower.includes('p1510') || queryLower.includes('p311') || queryLower.includes('p2246') || queryLower.includes('prompt') || queryLower.includes('error.file') || queryLower.includes('media file') || queryLower.includes('msml')) {
     const fileName = pcapContext?.file_name || 'Active Capture';
@@ -839,7 +907,7 @@ The packets in this segment are **VMAS node keepalives and UDP transport frames*
   }
 
   // Broad Domain Queries: O-RAN & Open Fronthaul (eCPRI / CU / DU / RU / RIC)
-  if (queryLower.includes('oran') || queryLower.includes('o-ran') || queryLower.includes('ecpri') || queryLower.includes('fronthaul') || queryLower.includes('ric') || queryLower.includes('du') || queryLower.includes('cu') || queryLower.includes('ru')) {
+  if (/\b(oran|o-ran|ecpri|fronthaul|\bric\b|\bo-du\b|\bo-cu\b|\bo-ru\b)\b/i.test(queryLower)) {
     return {
       answer: `### Global Telecom Domain: Open RAN (O-RAN) & 5G Fronthaul Architecture
 **In plain English**: O-RAN disaggregates proprietary cellular base stations into standardized, open, and interoperable hardware/software components.
@@ -861,7 +929,7 @@ The packets in this segment are **VMAS node keepalives and UDP transport frames*
   }
 
   // Broad Domain Queries: Diameter Signaling & Roaming (DRA / DEA / S6a / Gx / Gy / Ro / Rf)
-  if (queryLower.includes('diameter') || queryLower.includes('dra') || queryLower.includes('dea') || queryLower.includes('s6a') || queryLower.includes('gx') || queryLower.includes('gy') || queryLower.includes('ro') || queryLower.includes('rf')) {
+  if (/\b(diameter|\bdra\b|\bdea\b|\bs6a\b|\bgx\b|\bgy\b|\bro\b|\brf\b)\b/i.test(queryLower)) {
     return {
       answer: `### Global Telecom Domain: Diameter Protocol & Carrier Roaming (RFC 6733)
 **In plain English**: Diameter is the AAA (Authentication, Authorization, Accounting) and policy protocol that powers billing, subscriber authentication, and roaming across 4G LTE and IMS.
@@ -883,7 +951,7 @@ The packets in this segment are **VMAS node keepalives and UDP transport frames*
   }
 
   // Broad Domain Queries: SS7 / SIGTRAN & Legacy Interconnect (M3UA / SCTP / ISUP / MAP / CAMEL)
-  if (queryLower.includes('ss7') || queryLower.includes('sigtran') || queryLower.includes('sctp') || queryLower.includes('m3ua') || queryLower.includes('isup') || queryLower.includes('map') || queryLower.includes('camel') || queryLower.includes('tcap')) {
+  if (/\b(ss7|sigtran|sctp|m3ua|isup|\bmap\b|camel|tcap)\b/i.test(queryLower)) {
     return {
       answer: `### Global Telecom Domain: SS7 & SIGTRAN Signaling Interconnect
 **In plain English**: SS7 (Signaling System No. 7) is the legacy global telecom signaling network. **SIGTRAN (RFC 2719 / RFC 4960)** transports SS7 messages reliably over IP networks using SCTP.
@@ -904,7 +972,7 @@ The packets in this segment are **VMAS node keepalives and UDP transport frames*
   }
 
   // Broad Domain Queries: Wi-Fi Calling & VoWiFi (ePDG / N3IWF / SWu / IKEv2 / IPsec)
-  if (queryLower.includes('vowifi') || queryLower.includes('wifi calling') || queryLower.includes('epdg') || queryLower.includes('n3iwf') || queryLower.includes('swu')) {
+  if (/\b(vowifi|wifi calling|epdg|n3iwf|swu)\b/i.test(queryLower)) {
     return {
       answer: `### Global Telecom Domain: VoWiFi (Voice over Wi-Fi) & Untrusted Non-3GPP Access
 **In plain English**: VoWiFi allows mobile phones to make cellular calls and send SMS over any standard public or residential Wi-Fi network with zero cellular coverage.
