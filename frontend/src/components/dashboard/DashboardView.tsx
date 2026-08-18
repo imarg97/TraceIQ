@@ -40,12 +40,15 @@ export const DashboardView: React.FC = () => {
   const mainContainerRef = useRef<HTMLDivElement>(null);
 
   const [expandedNodes, setExpandedNodes] = useState<{ [key: string]: boolean }>({
+    frame: false,
     eth: false,
     ip: false,
     transport: false,
-    sip: true,
-    headers: true,
-    body: true
+    sip: false,
+    vmas_internal: false,
+    data_payload: false,
+    headers: false,
+    body: false
   });
 
   const [expandedHeaderDetails, setExpandedHeaderDetails] = useState<{ [key: string]: boolean }>({});
@@ -861,10 +864,10 @@ export const DashboardView: React.FC = () => {
                       onClick={() => toggleNode('frame')}
                       className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
                     >
-                      {expandedNodes.frame !== false ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                      {expandedNodes.frame ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                       <span>Frame {activePkt.index}: {activePkt.length} bytes on wire ({activePkt.length * 8} bits)</span>
                     </div>
-                    {expandedNodes.frame !== false && (
+                    {expandedNodes.frame && (
                       <div className="p-2.5 bg-white dark:bg-black/30 border-t border-slate-100 dark:border-ag-darkBorder/40 flex flex-col gap-1 text-[11px] text-slate-600 dark:text-slate-400">
                         <div>Arrival Time: {activePkt.timestamp_str}</div>
                         <div>Frame Number: {activePkt.index}</div>
@@ -1086,11 +1089,11 @@ export const DashboardView: React.FC = () => {
                         className="flex items-center justify-between p-2.5 bg-purple-500/10 cursor-pointer font-bold text-purple-600 dark:text-purple-400 hover:bg-purple-500/15 transition-colors"
                       >
                         <div className="flex items-center gap-1.5">
-                          {expandedNodes.vmas_internal !== false ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          {expandedNodes.vmas_internal ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           <span>VMAS Cluster Management Layer (perfMonServe Telemetry)</span>
                         </div>
                       </div>
-                      {expandedNodes.vmas_internal !== false && (
+                      {expandedNodes.vmas_internal && (
                         <div className="p-3 bg-white dark:bg-ag-darkSurface/60 border-t border-purple-500/20 flex flex-col gap-2">
                           <div className="p-2 rounded bg-slate-100 dark:bg-black font-mono text-xs text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-ag-darkBorder break-all">
                             {activePkt.raw_text || 'az1-vmas-vmas-vmas-containe::getChildObject: child object=7 not found'}
@@ -1107,10 +1110,10 @@ export const DashboardView: React.FC = () => {
                         onClick={() => toggleNode('data_payload')}
                         className="flex items-center gap-1.5 p-2 bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium"
                       >
-                        {expandedNodes.data_payload !== false ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                        {expandedNodes.data_payload ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                         <span>Data Payload ({Math.max(0, activePkt.length - 34)} bytes)</span>
                       </div>
-                      {expandedNodes.data_payload !== false && (
+                      {expandedNodes.data_payload && (
                         <div className="p-2.5 bg-white dark:bg-black/30 border-t border-slate-100 dark:border-ag-darkBorder/40 flex flex-col gap-1 text-[11px] text-slate-600 dark:text-slate-400">
                           <div>Length: {Math.max(0, activePkt.length - 34)} bytes</div>
                           <div>Data: {activePkt.info}</div>
