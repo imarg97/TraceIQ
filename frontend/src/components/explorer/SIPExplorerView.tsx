@@ -28,13 +28,13 @@ export const SIPExplorerView: React.FC = () => {
   const bottomContainerRef = useRef<HTMLDivElement>(null);
 
   const [expandedNodes, setExpandedNodes] = useState<{ [key: string]: boolean }>({
-    frame: true,
+    frame: false,
     eth: false,
     ip: false,
     transport: false,
-    sip: true,
-    headers: true,
-    body: true
+    sip: false,
+    headers: false,
+    body: false
   });
 
   const [expandedHeaders, setExpandedHeaders] = useState<{ [key: string]: boolean }>({});
@@ -258,14 +258,14 @@ export const SIPExplorerView: React.FC = () => {
           className="bg-white dark:bg-ag-darkCard border border-slate-200 dark:border-ag-darkBorder rounded-xl overflow-hidden flex flex-col shadow-xs min-h-[120px]"
         >
           {/* Table Header */}
-          <div className="flex bg-slate-100 dark:bg-ag-darkSurface border-b border-slate-200 dark:border-ag-darkBorder p-2 font-heading text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0">
-            <div className="w-14">No.</div>
-            <div className="w-24">Time</div>
-            <div className="w-36">Source</div>
-            <div className="w-36">Destination</div>
-            <div className="w-20">Protocol</div>
-            <div className="w-20">Length</div>
-            <div className="flex-1">Info</div>
+          <div className="flex items-center bg-slate-100 dark:bg-ag-darkSurface border-b border-slate-200 dark:border-ag-darkBorder px-3 py-2.5 font-heading text-[11px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider shrink-0 gap-2">
+            <div className="w-16 shrink-0">No.</div>
+            <div className="w-24 shrink-0">Time</div>
+            <div className="w-32 shrink-0">Source</div>
+            <div className="w-32 shrink-0">Destination</div>
+            <div className="w-16 shrink-0">Protocol</div>
+            <div className="w-16 shrink-0">Length</div>
+            <div className="flex-1 min-w-0">Info</div>
           </div>
 
           {/* Table Rows */}
@@ -279,17 +279,17 @@ export const SIPExplorerView: React.FC = () => {
                 <div 
                   key={pkt.id || pkt.index}
                   onClick={() => setSelectedPacket(pkt)}
-                  className={`flex items-center p-2 cursor-pointer transition-colors ${
+                  className={`flex items-center px-3 py-2 cursor-pointer transition-colors gap-2 ${
                     isSelected 
                       ? 'bg-sky-500/15 dark:bg-sky-500/20 text-slate-900 dark:text-slate-100 font-semibold border-l-4 border-l-sky-500' 
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <div className="w-14 font-bold text-slate-500">{pkt.index}</div>
-                  <div className="w-24 text-slate-500 dark:text-slate-400 text-[11px]">{pkt.timestamp_str || pkt.time.toFixed(3)}</div>
-                  <div className="w-36 truncate font-medium" title={pkt.source}>{pkt.source}</div>
-                  <div className="w-36 truncate font-medium" title={pkt.destination}>{pkt.destination}</div>
-                  <div className="w-20">
+                  <div className="w-16 shrink-0 font-bold text-slate-500 text-[11px]">{pkt.index}</div>
+                  <div className="w-24 shrink-0 text-slate-500 dark:text-slate-400 text-[11px] font-mono">{pkt.timestamp_str || pkt.time.toFixed(3)}</div>
+                  <div className="w-32 shrink-0 truncate font-medium text-[11px]" title={pkt.source}>{pkt.source}</div>
+                  <div className="w-32 shrink-0 truncate font-medium text-[11px]" title={pkt.destination}>{pkt.destination}</div>
+                  <div className="w-16 shrink-0">
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                       pkt.protocol === 'SIP' 
                         ? 'bg-ag-primary/20 text-ag-primary border border-ag-primary/40' 
