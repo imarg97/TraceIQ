@@ -73,25 +73,83 @@ function renderFormattedText(text: string) {
   );
 }
 
+function getDynamicCapturePrompts(pcap: any): string[] {
+  if (!pcap) return ["What is SIP?", "What is RTP?", "Explain call flow"];
+
+  const fileName = (pcap.file_name || '').toLowerCase();
+  const rawText = pcap.packets?.slice(0, 50).map((p: any) => p.raw_text || '').join(' ').toLowerCase() || '';
+  const isVmas = fileName.includes('vmas') || rawText.includes('msml') || rawText.includes('vmas') || pcap.top_sip_methods?.['INFO'];
+  const isPaco = fileName.includes('paco') || fileName.includes('epc') || fileName.includes('5gc') || pcap.protocol_distribution?.['GTP'] || pcap.protocol_distribution?.['S1AP'];
+  const is5G = fileName.includes('5g') || rawText.includes('ngap') || rawText.includes('sbi') || pcap.protocol_distribution?.['NGAP'];
+
+  if (isVmas) {
+    return [
+      "Is there any missing .wav audio file?",
+      "Explain VMAS voicemail deposit and retrieval",
+      "Why did the 487 Request Terminated occur?",
+      "What audio codecs are negotiated on port 21336?",
+      `What does frame ${pcap.packets?.[0]?.index || 1} do?`
+    ];
+  }
+
+  if (isPaco) {
+    return [
+      "Did the GTPv2-C Create Session Request succeed?",
+      "Explain Default vs Dedicated Bearer QCI values",
+      "Are there any S1AP or 5G NAS rejection causes?",
+      "What is the allocated GTP-U TEID endpoint?",
+      `What does frame ${pcap.packets?.[0]?.index || 1} do?`
+    ];
+  }
+
+  if (is5G) {
+    return [
+      "What HTTP/2 REST APIs were invoked on the SBI?",
+      "Explain 5G NAS Registration & Security Handshake",
+      "Check PFCP session establishment on N4 interface",
+      "What 5QI QoS profile was assigned to this flow?",
+      `What does frame ${pcap.packets?.[0]?.index || 1} do?`
+    ];
+  }
+
+  // Default Carrier IMS / VoLTE
+  return [
+    "Is this PCAP successful or failed?",
+    "What is the SIP Call-ID and caller MSISDN?",
+    "What is SIP and how does SDP negotiate AMR-WB?",
+    "Why did the 401 Unauthorized challenge occur?",
+    `What does frame ${pcap.packets?.[0]?.index || 1} do?`
+  ];
+}
+
 export const AICopilotView: React.FC = () => {
   const { currentPcap } = useTraceStore();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'msg_1',
-      sender: 'ai',
-      text: `Hello! I am your TraceIQ Telecom AI Copilot. 
+  const dynamicPrompts = getDynamicCapturePrompts(currentPcap);
 
-I have analyzed **${currentPcap?.file_name || 'active trace'}** (${currentPcap?.packet_count || 0} packets, health score **${currentPcap?.health_score || 98}%**).
+  const createInitialMessage = (pcap: any, prompts: string[]): ChatMessage => ({
+    id: 'msg_1',
+    sender: 'ai',
+    text: `Hello! I am your TraceIQ Telecom AI Copilot. 
+
+I have analyzed **${pcap?.file_name || 'active trace'}** (${pcap?.packet_count || 0} packets, health score **${pcap?.health_score || 98}%**).
 
 You can ask me anything about telecom protocols or this specific capture:
-- **"What is RTP (Real-Time Transport Protocol)?"**
-- **"Explain VMAS voicemail deposit and retrieval"**
-- **"What is SIP and how does SDP negotiate codecs?"**
-- **"What does frame ${currentPcap?.packets[0]?.index || 1} do?"**
-- **"Why did the 401 Unauthorized challenge occur?"**`,
-      timestamp: 'Just now'
-    }
+${prompts.map(p => `- **"${p}"**`).join('\n')}`,
+    timestamp: 'Just now'
+  });
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    createInitialMessage(currentPcap, dynamicPrompts)
   ]);
+
+  // Update initial message whenever the active PCAP file changes
+  useEffect(() => {
+    if (currentPcap) {
+      const prompts = getDynamicCapturePrompts(currentPcap);
+      setMessages([createInitialMessage(currentPcap, prompts)]);
+    }
+  }, [currentPcap?.file_name]);
+
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -136,13 +194,7 @@ You can ask me anything about telecom protocols or this specific capture:
 
   if (!currentPcap) return null;
 
-  const quickPrompts = [
-    "What is RTP?",
-    "Explain VMAS voicemail",
-    "What is SIP?",
-    "Why 401 Unauthorized?",
-    `What does frame ${currentPcap.packets[0]?.index || 1} do?`
-  ];
+  const quickPrompts = dynamicPrompts;
 
   const handleSaveGeminiKey = () => {
     if (geminiKeyInput.trim()) {

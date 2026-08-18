@@ -388,8 +388,8 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
    - The VMAS application server instructed the Media Resource Function (MRFP) at \`172.11.15.215:5060\` to play an automated greeting/prompt via **MSML (RFC 5022)**.
    - **Target Audio URI**: \`file:///var/vmas/prompts/${detectedWavName}\`
 
-2. **The Failure Response (Pretty-Printed XML Payload View)**:
-   - When pretty-printed (as seen in Wireshark / Notepad++ XML view for Packet **#${errorPkt?.index || 393111}**, \`Call-ID: ${errorPkt?.call_id || 'MSML-Dialog'}\`):
+2. **The Failure Response (XML Payload Analysis)**:
+   - **Decoded MSML Control XML Payload** (Packet **#${errorPkt?.index || 393111}**, \`Call-ID: ${errorPkt?.call_id || 'MSML-Dialog'}\`):
 
 \`\`\`xml
 <!-- MSML Dialog Execution Request -->
