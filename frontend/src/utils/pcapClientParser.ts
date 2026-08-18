@@ -289,6 +289,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   }
 
   const textDecoder = new TextDecoder('utf-8');
+  const globalLinkType = totalBytes >= 24 ? dataView.getUint32(20, isLittleEndian) : 1;
 
   if (isPcap && totalBytes > 24) {
     let offset = 24; // Skip 24-byte global header
@@ -316,13 +317,31 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
       let dport = 5060;
       let payloadOffset = 0;
 
-      // Check for Ethernet + IPv4
-      if (inclLen >= 34 && pktBytes[12] === 0x08 && pktBytes[13] === 0x00) {
-        const ipProto = pktBytes[23];
-        srcIp = `${pktBytes[26]}.${pktBytes[27]}.${pktBytes[28]}.${pktBytes[29]}`;
-        dstIp = `${pktBytes[30]}.${pktBytes[31]}.${pktBytes[32]}.${pktBytes[33]}`;
-        const ipHeaderLen = (pktBytes[14] & 0x0f) * 4;
-        const transportOffset = 14 + ipHeaderLen;
+      // Determine Layer 2 Header Length (Ethernet vs Linux Cooked SLL v1 vs Raw IP)
+      let l2HeaderLen = 14;
+      let isIPv4 = false;
+
+      if (globalLinkType === 113 || (inclLen >= 16 && pktBytes[14] === 0x08 && pktBytes[15] === 0x00)) {
+        // Linux Cooked Capture v1 (SLL) - 16 bytes L2
+        l2HeaderLen = 16;
+        isIPv4 = (pktBytes[14] === 0x08 && pktBytes[15] === 0x00);
+      } else if (inclLen >= 14 && pktBytes[12] === 0x08 && pktBytes[13] === 0x00) {
+        // Standard Ethernet II - 14 bytes L2
+        l2HeaderLen = 14;
+        isIPv4 = true;
+      } else if (inclLen >= 20 && (pktBytes[0] >> 4) === 4) {
+        // Raw IPv4 - 0 bytes L2
+        l2HeaderLen = 0;
+        isIPv4 = true;
+      }
+
+      // Dissect IPv4 + Transport
+      if (isIPv4 && inclLen >= l2HeaderLen + 20) {
+        const ipProto = pktBytes[l2HeaderLen + 9];
+        srcIp = `${pktBytes[l2HeaderLen + 12]}.${pktBytes[l2HeaderLen + 13]}.${pktBytes[l2HeaderLen + 14]}.${pktBytes[l2HeaderLen + 15]}`;
+        dstIp = `${pktBytes[l2HeaderLen + 16]}.${pktBytes[l2HeaderLen + 17]}.${pktBytes[l2HeaderLen + 18]}.${pktBytes[l2HeaderLen + 19]}`;
+        const ipHeaderLen = (pktBytes[l2HeaderLen] & 0x0f) * 4;
+        const transportOffset = l2HeaderLen + ipHeaderLen;
 
         if (ipProto === 17 && inclLen >= transportOffset + 8) { // UDP
           sport = (pktBytes[transportOffset] << 8) | pktBytes[transportOffset + 1];
