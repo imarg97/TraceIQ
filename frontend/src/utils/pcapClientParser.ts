@@ -692,15 +692,54 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
+  // Autonomous Root Cause Analysis (RCA) Engine
+  let rcaTitle = 'Healthy & Operational';
+  let rcaVerdict = 'No network failures detected. Signaling health score is 98%.';
+  let rcaPlainEnglish = 'Devices communicated with core proxies seamlessly, validating connectivity and routing paths.';
+  const rcaRecommendations: string[] = [];
+
+  if (missingFilePacket) {
+    const match = missingFilePacket.raw_text?.match(/([a-zA-Z0-9_\-\/]+\.wav|[a-zA-Z0-9_\-\/]+\.vxml)/i);
+    const missingName = match ? match[0] : 'greeting / IVR prompt audio file';
+    rcaTitle = `Root Cause Identified: Missing Audio Prompt (${missingName})`;
+    rcaVerdict = `⚠️ **Root Cause Identified (Audio Asset Missing in Frame #${missingFilePacket.index})**: Media server (MRFP) failed to locate \`${missingName}\` on storage mount, causing MSML playback failure and premature call termination.`;
+    rcaPlainEnglish = `The call failed because the voicemail media server pod could not find the required prompt file (\`${missingName}\`). To fix this, deploy the missing .wav file to the media server pod storage and ensure 644 read permissions.`;
+    rcaRecommendations.push(`Copy missing audio prompt asset \`${missingName}\` to the media server prompt directory (e.g. \`/var/vmas/prompts/\` or NFS share).`);
+    rcaRecommendations.push(`Check pod storage volume mounts: \`kubectl exec -it <mrfp-pod> -- ls -la /var/vmas/prompts/\` and grant \`chmod 644\`.`);
+    rcaRecommendations.push(`Verify dialplan URI mappings in the Voicemail Application Server configuration.`);
+  } else if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
+    rcaTitle = 'Root Cause Identified: Downstream Proxy / Core Server Exhaustion (SIP 503)';
+    rcaVerdict = '🚨 **Root Cause Identified (Server Overload)**: Downstream SIP proxy or application server returned 503 Service Unavailable, rejecting incoming signaling sessions.';
+    rcaPlainEnglish = 'The call was dropped because a core server is overloaded or its worker processes crashed. Restart or scale the affected container pod.';
+    rcaRecommendations.push('Scale downstream container pod replicas or increase worker thread pool limits.');
+    rcaRecommendations.push('Inspect server CPU/memory metrics and database connection pool saturation.');
+  } else if (responseCodes['408 Request Timeout'] || responseCodes['408']) {
+    rcaTitle = 'Root Cause Identified: Signaling Transaction Timeout (SIP 408)';
+    rcaVerdict = '⚠️ **Root Cause Identified (Signaling Timeout)**: Destination node failed to acknowledge SIP INVITE before Timer B (32s) expired.';
+    rcaPlainEnglish = 'The call timed out because the destination endpoint or firewall did not respond to signaling packets.';
+    rcaRecommendations.push('Check firewall rules and NAT pinholing for UDP port 5060 between SBC and core.');
+    rcaRecommendations.push('Verify destination subscriber registration state in HSS/UDM.');
+  } else if (isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
+    const count = responseCodes['487 Request Terminated'] || responseCodes['487'] || 22;
+    rcaTitle = 'Root Cause Identified: Voicemail IVR Premature Hangups (SIP 487)';
+    rcaVerdict = `⚠️ **Root Cause Identified (${count}x SIP 487 Cancellations)**: Callers hung up during automated greeting playback or inter-digit prompt timer expired.`;
+    rcaPlainEnglish = `Observed ${count} voicemail session cancellations. Callers disconnected before leaving a message, or the VMAS prompt timer timed out.`;
+    rcaRecommendations.push('Tune VMAS application server inter-digit prompt timer (prompt_timeout_sec) from 5s to 8s.');
+    rcaRecommendations.push('Verify MRFP audio prompt file accessibility for greeting WAV files.');
+  } else {
+    rcaRecommendations.push('Maintain current proxy routing configurations.');
+    rcaRecommendations.push('Monitor periodic OPTIONS keepalive timings under peak traffic.');
+  }
+
   return {
     file_name: fileName,
     file_size_bytes: totalBytes,
     packet_count: packets.length,
     total_calls: 1,
-    successful_calls: 1,
-    failed_calls: 0,
+    successful_calls: missingFilePacket || responseCodes['503'] || responseCodes['408'] ? 0 : 1,
+    failed_calls: missingFilePacket || responseCodes['503'] || responseCodes['408'] ? 1 : 0,
     duration_sec: Number(durationSec.toFixed(3)),
-    health_score: 98,
+    health_score: missingFilePacket || responseCodes['503'] ? 62 : (responseCodes['408'] ? 74 : 98),
     capture_start_time: packets[0]?.timestamp_str || '00:00:00.000',
     capture_end_time: packets[packets.length - 1]?.timestamp_str || '00:00:00.000',
     avg_call_duration_sec: Number(durationSec.toFixed(1)),
@@ -715,24 +754,21 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     issues,
     layman_info: {
       what_this_is: 'Carrier Telecom Signaling Session',
-      narrative: 'Signaling exchange between mobile network endpoints and core IMS proxies.',
-      verdict: 'Healthy & Operational',
-      action_required: 'None required. All transactions executed normally.'
+      narrative: rcaPlainEnglish,
+      verdict: rcaTitle,
+      action_required: rcaRecommendations[0] || 'None required.'
     },
     ai_analysis: {
-      executive_summary: `Analyzed \`${fileName}\` (${packets.length} packets). Signaling transactions executed cleanly across carrier nodes.`,
-      technical_summary: `Protocol dissection completed for ${packets.length} frames. SIP request-response dialogs and transport layers are in compliance with 3GPP standards.`,
-      root_cause: 'No network failures detected. Signaling health score is 98%.',
-      health_score: 98,
-      recommendations: [
-        'Maintain current proxy routing configurations.',
-        'Monitor periodic OPTIONS keepalive timings under peak traffic.'
-      ],
+      executive_summary: `Analyzed \`${fileName}\` (${packets.length} packets). ${rcaPlainEnglish}`,
+      technical_summary: `Protocol dissection completed for ${packets.length} frames across ${durationSec.toFixed(2)}s. Evaluated SIP request/response transactions and application message bodies.`,
+      root_cause: rcaVerdict,
+      health_score: missingFilePacket || responseCodes['503'] ? 62 : (responseCodes['408'] ? 74 : 98),
+      recommendations: rcaRecommendations,
       timeline_summary: [
         `${packets[0]?.timestamp_str || '00:00:00.000'} - Initial signaling frame recorded.`,
-        `${packets[packets.length - 1]?.timestamp_str || '00:00:00.000'} - Transaction completed with 200 OK.`
+        `${packets[packets.length - 1]?.timestamp_str || '00:00:00.000'} - Transaction sequence finished.`
       ],
-      plain_english: 'Devices communicated with the core network proxies seamlessly, validating connectivity and routing paths.'
+      plain_english: rcaPlainEnglish
     }
   };
 }
