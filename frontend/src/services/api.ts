@@ -246,7 +246,62 @@ Once the file is deployed with 644 permissions, the MRFP will stream the greetin
       };
     }
 
-    // RCA Scenario B: Server Overload (503 Service Unavailable)
+    // RCA Scenario B: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures
+    const isPaco = fileName.toLowerCase().includes('paco') || 
+                   fileName.toLowerCase().includes('epc') || 
+                   fileName.toLowerCase().includes('5gc') || 
+                   packets.some(p => p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP' || p.protocol === 'PFCP' || p.raw_text?.includes('gtp') || p.raw_text?.includes('s1ap'));
+
+    const pacoErrPkt = packets.find(p => {
+      const txt = (p.raw_text || '').toLowerCase();
+      return txt.includes('context not found') || 
+             txt.includes('no resources') || 
+             txt.includes('denied') || 
+             txt.includes('esm failure') || 
+             txt.includes('dnn not supported') || 
+             txt.includes('plmn not allowed') || 
+             txt.includes('diameter_user_unknown');
+    });
+
+    if (pacoErrPkt || (isPaco && packets.some(p => p.raw_text?.toLowerCase().includes('reject') || p.raw_text?.toLowerCase().includes('failure')))) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA): Packet Core (PACO) Bearer Failure in \`${fileName}\`
+
+**Investigation Target**: **Packet Core (PACO) — 4G LTE EPC & 5G Standalone Core**  
+**Executive Verdict**: 🚨 **Root Cause: GTPv2-C Session / Dedicated Bearer Activation Rejected by Core (MME/PGW/UPF)**
+
+---
+
+### 🔍 1. Root Cause Identification (What Went Wrong):
+* **Failing Packet**: **Packet #${pacoErrPkt?.index || 1}** (\`${pacoErrPkt?.info || 'GTPv2-C Create Session Response'}\`)
+* **The Fault Mechanism**:
+  1. The User Equipment (UE) or eNodeB/gNodeB initiated an Initial Attach / PDU Session Establishment request.
+  2. The SGW/PGW or 5G UPF rejected the bearer activation due to APN/DNN mismatch, PCRF policy rule refusal on Gx, or user plane IP address pool exhaustion.
+  3. Control signaling returned an explicit rejection cause code, preventing the subscriber from obtaining data throughput.
+
+---
+
+### 🛠️ 2. Step-by-Step Solution (How to Fix the Problem):
+To get rid of this issue and restore mobile data connectivity for the subscriber:
+
+1. **Verify Subscriber APN / DNN Provisioning in HSS / UDM**:
+   - Confirm that the subscriber's IMSI/SUPI is provisioned with the requested Access Point Name (APN) or Data Network Name (DNN) (e.g. \`internet\` or \`ims\`).
+   - Check if default APN QoS profiles match the subscriber's active subscription plan.
+
+2. **Check PGW / UPF IP Pool & Tunnel Capacity**:
+   - Verify that the PGW or UPF has available IPv4/IPv6 addresses in its dynamically allocated subnet pool:
+   \`\`\`bash
+   # Inspect IP pool utilization on core user plane gateway
+   show ip pool <apn-name> summary
+   \`\`\`
+
+3. **Validate PCRF / PCF Policy Rules (Gx / N7 Interface)**:
+   - Ensure the policy controller (PCRF) is not returning \`DIAMETER_AUTHORIZATION_REJECTED\` during Credit-Control-Request (\`CCR-I\`) initialization.`,
+        provider: 'TraceIQ Autonomous PACO Root Cause Diagnostician'
+      };
+    }
+
+    // RCA Scenario C: Server Overload (503 Service Unavailable)
     if (has503) {
       return {
         answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
@@ -269,7 +324,7 @@ Once the file is deployed with 644 permissions, the MRFP will stream the greetin
       };
     }
 
-    // RCA Scenario C: Normal / Nominal Capture (No failures)
+    // RCA Scenario D: Normal / Nominal Capture (No failures)
     return {
       answer: `### 🎯 Root Cause & Health Analysis for \`${fileName}\`
 

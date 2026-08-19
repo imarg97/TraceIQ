@@ -719,13 +719,23 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaPlainEnglish = 'The call timed out because the destination endpoint or firewall did not respond to signaling packets.';
     rcaRecommendations.push('Check firewall rules and NAT pinholing for UDP port 5060 between SBC and core.');
     rcaRecommendations.push('Verify destination subscriber registration state in HSS/UDM.');
-  } else if (isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
-    const count = responseCodes['487 Request Terminated'] || responseCodes['487'] || 22;
-    rcaTitle = 'Root Cause Identified: Voicemail IVR Premature Hangups (SIP 487)';
-    rcaVerdict = `⚠️ **Root Cause Identified (${count}x SIP 487 Cancellations)**: Callers hung up during automated greeting playback or inter-digit prompt timer expired.`;
-    rcaPlainEnglish = `Observed ${count} voicemail session cancellations. Callers disconnected before leaving a message, or the VMAS prompt timer timed out.`;
-    rcaRecommendations.push('Tune VMAS application server inter-digit prompt timer (prompt_timeout_sec) from 5s to 8s.');
-    rcaRecommendations.push('Verify MRFP audio prompt file accessibility for greeting WAV files.');
+  } else if (hasPacoFailure || fileName.toLowerCase().includes('paco') || fileName.toLowerCase().includes('epc') || fileName.toLowerCase().includes('5gc')) {
+    const pacoErrPacket = packets.find(p => {
+      const txt = (p.raw_text || '').toLowerCase();
+      return txt.includes('context not found') || txt.includes('no resources') || txt.includes('denied') || txt.includes('esm failure') || txt.includes('dnn not supported') || txt.includes('diameter_user_unknown');
+    });
+
+    if (pacoErrPacket) {
+      rcaTitle = 'Root Cause Identified: Packet Core (PACO) Bearer / Session Rejection';
+      rcaVerdict = `🚨 **Root Cause Identified (PACO Session Rejection in Frame #${pacoErrPacket.index})**: GTPv2-C Create Session or S1AP/NAS Initial Context Setup was rejected by Core Network (MME/SGW/PGW/AMF).`;
+      rcaPlainEnglish = `The mobile subscriber data session failed because the Packet Core rejected the bearer activation. Subscriber APN/DNN is not authorized in HSS/UDM, or PGW/UPF IP pool is exhausted.`;
+      rcaRecommendations.push('Verify subscriber APN/DNN subscription profiles and roaming authorization in HSS/UDM.');
+      rcaRecommendations.push('Check SGW/PGW and UPF GTP-U tunnel capacity and IP pool utilization.');
+      rcaRecommendations.push('Inspect PCRF/PCF Gx policy enforcement rules for subscriber QoS allocation.');
+    } else {
+      rcaRecommendations.push('Verify SGW/PGW GTP-U bearer paths and MME S11 control signaling.');
+      rcaRecommendations.push('Monitor GTP-C Create Session latency across peak attach windows.');
+    }
   } else {
     rcaRecommendations.push('Maintain current proxy routing configurations.');
     rcaRecommendations.push('Monitor periodic OPTIONS keepalive timings under peak traffic.');
