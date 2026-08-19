@@ -126,17 +126,38 @@ export const AICopilotView: React.FC = () => {
   const { currentPcap } = useTraceStore();
   const dynamicPrompts = getDynamicCapturePrompts(currentPcap);
 
-  const createInitialMessage = (pcap: any, prompts: string[]): ChatMessage => ({
-    id: 'msg_1',
-    sender: 'ai',
-    text: `Hello! I am your TraceIQ Telecom AI Copilot. 
+  const createInitialMessage = (pcap: any, prompts: string[]): ChatMessage => {
+    const issues = pcap?.issues || [];
+    const hasFault = issues.length > 0 && issues[0]?.severity !== 'LOW';
 
-I have analyzed **${pcap?.file_name || 'active trace'}** (${pcap?.packet_count || 0} packets, health score **${pcap?.health_score || 98}%**).
+    let rcaContent = '';
+    if (hasFault) {
+      const topIssue = issues[0];
+      rcaContent = `\n\n### 🚨 Autonomous Failure & Root Cause Diagnosis:
+* **Identified Fault**: **${topIssue.title}** (${topIssue.category || 'Core Network'})
+* **Root Cause**: ${topIssue.possible_cause || topIssue.description}
+* **Probable Fix / Action Required**:
+${topIssue.recommendation.split('\n').map((r: string) => `  - ${r}`).join('\n')}`;
+    } else {
+      rcaContent = `\n\n### ✅ Automated Health Verdict:
+All transactions executed normally with zero signaling faults. Health score is **${pcap?.health_score || 98}%**.`;
+    }
 
-You can ask me anything about telecom protocols or this specific capture:
+    return {
+      id: 'msg_1',
+      sender: 'ai',
+      text: `👋 **TraceIQ Telecom Diagnostician Report for \`${pcap?.file_name || 'Active Trace'}\`**
+- **Packets Analyzed**: **${pcap?.packet_count || 0} frames**
+- **Session Duration**: **${pcap?.duration_sec || 0}s**
+- **Health Score**: **${pcap?.health_score || 98}/100**${rcaContent}
+
+---
+
+💡 **Suggested deep-dive inquiries you can ask:**
 ${prompts.map(p => `- **"${p}"**`).join('\n')}`,
-    timestamp: 'Just now'
-  });
+      timestamp: 'Just now'
+    };
+  };
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     createInitialMessage(currentPcap, dynamicPrompts)
