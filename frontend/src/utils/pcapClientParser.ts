@@ -552,47 +552,63 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     finalProtocolCounts[p.protocol] = (finalProtocolCounts[p.protocol] || 0) + 1;
   }
 
+  // Strict Domain Detection: Do NOT classify generic IMS/VoLTE captures as VMAS unless explicit signatures exist
   const isVmasTrace = fileName.toLowerCase().includes('vmas') || 
-                      packets.some(p => p.raw_text?.includes('msml') || p.raw_text?.includes('vmas') || p.sip_method === 'INFO') ||
-                      responseCodes['487 Request Terminated'] || 
-                      responseCodes['487'];
+                      packets.some(p => p.raw_text?.includes('msml') || p.raw_text?.includes('vmas') || (p.sip_method === 'INFO' && p.raw_text?.includes('telephony-event')));
+
+  const isPacoTrace = fileName.toLowerCase().includes('paco') || 
+                      fileName.toLowerCase().includes('epc') || 
+                      fileName.toLowerCase().includes('5gc') || 
+                      packets.some(p => p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP' || p.protocol === 'PFCP');
 
   const issues: IssueEngineItem[] = [];
 
-  // Issue 1: VMAS Voicemail Terminations & Premature Hangups (487 Request Terminated)
-  if (isVmasTrace || responseCodes['487 Request Terminated'] || responseCodes['487']) {
-    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'] || 22;
+  // Issue 1: VMAS Voicemail Terminations & Premature Hangups (487 Request Terminated) - ONLY if it's genuinely a VMAS trace
+  if (isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
+    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'];
     issues.push({
       id: 'iss_vmas_487',
       title: 'VMAS IVR Prompt Timeout & Session Cancellation (SIP 487)',
       severity: 'HIGH',
       category: 'Voicemail Application Server',
-      affected_call_id: 'MSML Deposit Dialogs (e.g. Frames #393111, #393260)',
-      description: `Observed ${termCount} occurrences of SIP 487 Request Terminated. In VMAS carrier voicemail architectures, 487 responses occur when a calling party disconnects before completing voicemail greeting playback/deposit, or when an IVR inter-digit prompt timer expires on the application server.`,
-      possible_cause: 'Subscriber premature hangup during automated voicemail deposit greeting, or VMAS application server prompt inter-digit timer expiry.',
-      recommendation: '1. Tune VMAS application server inter-digit timers (prompt_timeout_sec) from 5s to 8s.\n2. Verify MRFP audio prompt file availability for greeting WAV files.\n3. Verify SBC media gateway session release timers.',
+      affected_call_id: 'MSML Deposit Dialogs',
+      description: `Observed ${termCount} occurrences of SIP 487 Request Terminated in VMAS voicemail dialogs. Occurs when a calling party disconnects before completing greeting playback, or when an IVR inter-digit prompt timer expires.`,
+      possible_cause: 'Subscriber premature hangup during automated voicemail deposit greeting, or VMAS prompt timer expiry.',
+      recommendation: '1. Tune VMAS application server inter-digit timers (prompt_timeout_sec) from 5s to 8s.\n2. Verify MRFP audio prompt file availability for greeting WAV files.',
       rfc_reference: 'RFC 3261 Section 21.4.25 (487 Request Terminated), 3GPP TS 24.229'
+    });
+  } else if (!isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
+    // Standard IMS Call Cancellation
+    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'];
+    issues.push({
+      id: 'iss_ims_487',
+      title: 'Client Call Cancellation (SIP 487 Request Terminated)',
+      severity: 'MEDIUM',
+      category: 'Carrier IMS Signaling',
+      affected_call_id: 'Canceled Dialogs',
+      description: `Observed ${termCount} occurrences of SIP 487 Request Terminated. In standard IMS/VoLTE networks, this indicates the calling party released the call (sent SIP CANCEL) before the remote callee answered.`,
+      possible_cause: 'Caller hung up before remote party picked up (unanswered call / user cancellation).',
+      recommendation: 'Standard caller disconnect behavior. No core network action required unless accompanied by delayed 180 Ringing.',
+      rfc_reference: 'RFC 3261 Section 21.4.25 (487 Request Terminated)'
     });
   }
 
-  // Issue 2: Deep Payload Scanner: Missing Audio Prompt / Media Files (WAV / MSML 404 / error.file)
+  // Issue 2: Deep Payload Scanner: Missing Audio Prompt / Media Files (WAV / MSML 404 / error.file) - ONLY if genuinely detected in payload
   const missingFilePacket = packets.find(p => {
-    const txt = (p.body || '' + p.raw_text || '').toLowerCase();
-    return txt.includes('error.file') || 
-           txt.includes('file not found') || 
-           txt.includes('.wav not found') || 
-           txt.includes('filenotfound') || 
-           txt.includes('prompt not found') ||
-           (txt.includes('msml.dialog.exit') && (txt.includes('status="404"') || txt.includes('status="400"')));
+    const full = ((p.body || '') + ' ' + (p.raw_text || '')).toLowerCase();
+    if (full.includes('perfmon') || full.includes('pfmobject')) return false;
+    return full.includes('error.file') || 
+           full.includes('file not found') || 
+           full.includes('.wav not found') || 
+           full.includes('filenotfound') || 
+           (full.includes('msml.dialog.exit') && (full.includes('status="404"') || full.includes('status="400"')));
   });
 
-  if (missingFilePacket || (isVmasTrace && (responseCodes['487'] || responseCodes['487 Request Terminated']))) {
+  if (missingFilePacket) {
     let errorSnippet = 'error.file.notfound: Audio prompt asset or greeting WAV file was not found on media server storage.';
-    if (missingFilePacket) {
-      const match = missingFilePacket.raw_text?.match(/([a-zA-Z0-9_\-\/]+\.wav|[a-zA-Z0-9_\-\/]+\.vxml|error\.[a-zA-Z0-9_\.]+)/i);
-      if (match) {
-        errorSnippet = `Detected missing file reference in payload: "${match[0]}" (Packet #${missingFilePacket.index})`;
-      }
+    const match = missingFilePacket.raw_text?.match(/([a-zA-Z0-9_\-\/]+\.wav|[a-zA-Z0-9_\-\/]+\.vxml|error\.[a-zA-Z0-9_\.]+)/i);
+    if (match) {
+      errorSnippet = `Detected missing file reference in payload: "${match[0]}" (Packet #${missingFilePacket.index})`;
     }
 
     issues.push({
@@ -634,9 +650,9 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 4: VMAS High-Density DTMF SIP INFO Traffic
-  if (isVmasTrace || sipMethods['INFO']) {
-    const infoCount = sipMethods['INFO'] || 730;
+  // Issue 4: High-Density DTMF SIP INFO Traffic - ONLY if INFO frames exist and count > 10
+  if (sipMethods['INFO'] && sipMethods['INFO'] > 10) {
+    const infoCount = sipMethods['INFO'];
     issues.push({
       id: 'iss_vmas_dtmf',
       title: `High-Density SIP INFO DTMF Navigation Traffic (${infoCount}+ Frames)`,

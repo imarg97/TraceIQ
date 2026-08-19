@@ -301,7 +301,11 @@ ${prompts.map(p => `- **"${p}"**`).join('\n')}`,
             </h2>
             <div className="text-xs font-sans text-slate-700 dark:text-slate-300 space-y-2.5 leading-relaxed">
               <p>{formatInlineMarkdown(currentPcap.ai_analysis.executive_summary)}</p>
-              <p>{formatInlineMarkdown(currentPcap.ai_analysis.plain_english || 'The signaling sequence completed successfully with full session negotiation.')}</p>
+              {currentPcap.ai_analysis.plain_english && 
+               currentPcap.ai_analysis.plain_english !== currentPcap.ai_analysis.executive_summary &&
+               !currentPcap.ai_analysis.executive_summary.includes(currentPcap.ai_analysis.plain_english) && (
+                <p>{formatInlineMarkdown(currentPcap.ai_analysis.plain_english)}</p>
+              )}
             </div>
           </div>
 
