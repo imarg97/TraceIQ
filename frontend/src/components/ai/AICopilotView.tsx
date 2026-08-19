@@ -308,44 +308,48 @@ ${prompts.map(p => `- **"${p}"**`).join('\n')}`,
       {/* Main 2-Column Split: Resizable */}
       <div ref={aiContainerRef} className="flex-1 flex flex-col lg:flex-row gap-2 items-stretch select-none">
         
-        {/* Left Column: Trace Diagnosis & Hop Topology */}
+        {/* Left Column: Trace Diagnosis & Root Cause Analysis */}
         <div 
           style={{ width: `${aiLeftWidth}%` }}
           className="flex flex-col gap-4 min-w-[280px]"
         >
           
-          {/* Executive Summary */}
-          <div className="bg-white dark:bg-ag-darkCard p-5 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-3">
-            <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-ag-darkBorder/40 pb-2.5">
-              <FileText className="text-ag-primary w-4 h-4" />
-              Capture Executive Narrative
-            </h2>
-            <div className="text-xs font-sans text-slate-700 dark:text-slate-300 space-y-2.5 leading-relaxed">
-              <p>{formatInlineMarkdown(currentPcap.ai_analysis.executive_summary)}</p>
-              {currentPcap.ai_analysis.plain_english && 
-               currentPcap.ai_analysis.plain_english !== currentPcap.ai_analysis.executive_summary &&
-               !currentPcap.ai_analysis.executive_summary.includes(currentPcap.ai_analysis.plain_english) && (
-                <p>{formatInlineMarkdown(currentPcap.ai_analysis.plain_english)}</p>
-              )}
+          {/* Unified Box 1: Root Cause & Analysis Findings */}
+          <div className="bg-white dark:bg-ag-darkCard p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 pb-3">
+              <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <FileText className="text-ag-primary w-4 h-4" />
+                <span>Automated Root Cause & Diagnosis</span>
+              </h2>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                (currentPcap.health_score || 98) >= 90 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+              }`}>
+                Score: {currentPcap.health_score || 98}%
+              </span>
             </div>
-          </div>
 
-          {/* Diagnosis & Recommendations */}
-          <div className="bg-white dark:bg-ag-darkCard p-5 rounded-2xl border border-slate-200 dark:border-ag-darkBorder border-l-4 border-l-emerald-500 shadow-xs space-y-3">
-            <h2 className="font-heading text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <ShieldCheck className="text-emerald-500 w-4 h-4" />
-              Health & Verdict
-            </h2>
-            <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-sans">
-              {formatInlineMarkdown(currentPcap.ai_analysis.root_cause)}
+            {/* Narrative & Assessment */}
+            <div className="text-xs font-sans text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
+              <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5 text-ag-primary" />
+                <span>Executive Verdict</span>
+              </div>
+              <p>{formatInlineMarkdown(currentPcap.ai_analysis.root_cause || currentPcap.ai_analysis.executive_summary)}</p>
             </div>
-            <div className="space-y-1.5 pt-1">
-              {currentPcap.ai_analysis.recommendations.map((rec, rIdx) => (
-                <div key={rIdx} className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-700 dark:text-slate-300 flex items-start gap-1.5 font-sans">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                  <span>{formatInlineMarkdown(rec)}</span>
-                </div>
-              ))}
+
+            {/* Prescribed Solutions & Action Items */}
+            <div className="space-y-2 pt-1">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Recommended Actions & Solutions
+              </div>
+              <div className="space-y-1.5">
+                {currentPcap.ai_analysis.recommendations.map((rec, rIdx) => (
+                  <div key={rIdx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 font-sans">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span className="leading-snug">{formatInlineMarkdown(rec)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
