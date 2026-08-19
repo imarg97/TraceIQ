@@ -666,18 +666,41 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 5: Critical Server Overload (503 Service Unavailable)
-  if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
-    issues.push({
-      id: 'iss_503',
-      title: 'Downstream Core Server Overload / Unavailable (SIP 503)',
-      severity: 'CRITICAL',
-      category: 'Core Server Exhaustion',
-      description: 'Downstream proxy or Application Server returned 503 Service Unavailable, rejecting incoming call signaling.',
-      possible_cause: 'CPU/memory exhaustion, worker thread saturation, or database connection pool depletion on the target proxy.',
-      recommendation: 'Inspect CPU/memory saturation on target server, scale worker pools, and verify downstream load-balancer health checks.',
-      rfc_reference: 'RFC 3261 Section 21.5.4 (503 Service Unavailable)'
-    });
+  // Issue 5: ASBC Rx Interface AAA Timeout / PCRF Policy Rejection (CC_RX_SERVICE_FAILED / SIP 503)
+  const rxTimeoutPacket = packets.find(p => {
+    const txt = (p.raw_text || '' + p.info || '').toLowerCase();
+    return txt.includes('wait offer aaa timeout') || 
+           txt.includes('cc_rx_service_failed') || 
+           txt.includes('rx_service_failed') ||
+           txt.includes('aaa timeout') ||
+           (txt.includes('503') && (txt.includes('aaa') || txt.includes('pcrf') || txt.includes('rx')));
+  });
+
+  if (rxTimeoutPacket || responseCodes['503 Service Unavailable'] || responseCodes['503']) {
+    if (rxTimeoutPacket) {
+      issues.push({
+        id: 'iss_asbc_rx_timeout',
+        title: 'ASBC Rx Interface Policy Timeout (CC_RX_SERVICE_FAILED / SIP 503)',
+        severity: 'CRITICAL',
+        category: 'SBC Policy & Charging (Rx / Diameter)',
+        affected_call_id: rxTimeoutPacket.call_id || 'ASBC Dialog Stream',
+        description: `ASBC returned \`SIP 503 Service Unavailable\` with cause \`text="wait offer AAA timeout(o),iCode=CC_RX_SERVICE_FAILED"\`. During initial INVITE session setup, the ASBC sent an AAR (AA-Request) over the Diameter Rx interface to the PCRF (Policy and Charging Rules Function) for QoS authorization and media gating. The PCRF failed to respond with an AAA (AA-Answer) within the configured timer window.`,
+        possible_cause: 'PCRF server unreachability, Diameter DRA routing loop/failure, Rx diameter link congestion, or missing PCRF realm route on the ASBC.',
+        recommendation: '1. Inspect Diameter Rx link status between ASBC and PCRF/DRA: `show diameter peer-status rx`.\n2. Check PCRF CPU/memory and Diameter AA-Answer latency SLA.\n3. Verify ASBC Rx request timeout timer (e.g. increase timer from 2000ms to 4000ms temporarily).\n4. If PCRF is unreachable, configure ASBC Rx fallback policy (Bypass Rx on AAA Timeout) to allow basic call completion.',
+        rfc_reference: '3GPP TS 29.214 (Diameter Rx Interface), RFC 6733 (Diameter Base Protocol)'
+      });
+    } else {
+      issues.push({
+        id: 'iss_503',
+        title: 'Downstream Core Server Overload / Unavailable (SIP 503)',
+        severity: 'CRITICAL',
+        category: 'Core Server Exhaustion',
+        description: 'Downstream proxy or Application Server returned 503 Service Unavailable, rejecting incoming call signaling.',
+        possible_cause: 'CPU/memory exhaustion, worker thread saturation, or database connection pool depletion on the target proxy.',
+        recommendation: 'Inspect CPU/memory saturation on target server, scale worker pools, and verify downstream load-balancer health checks.',
+        rfc_reference: 'RFC 3261 Section 21.5.4 (503 Service Unavailable)'
+      });
+    }
   }
 
   // Issue 6: Request Timeout (408 Request Timeout)
@@ -722,7 +745,13 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaPlainEnglish = `The call failed because the voicemail media server pod could not find the required prompt file (\`${missingName}\`). To fix this, deploy the missing .wav file to the media server pod storage and ensure 644 read permissions.`;
     rcaRecommendations.push(`Copy missing audio prompt asset \`${missingName}\` to the media server prompt directory (e.g. \`/var/vmas/prompts/\` or NFS share).`);
     rcaRecommendations.push(`Check pod storage volume mounts: \`kubectl exec -it <mrfp-pod> -- ls -la /var/vmas/prompts/\` and grant \`chmod 644\`.`);
-    rcaRecommendations.push(`Verify dialplan URI mappings in the Voicemail Application Server configuration.`);
+  } else if (rxTimeoutPacket) {
+    rcaTitle = 'Root Cause Identified: ASBC Diameter Rx AAA Timeout (CC_RX_SERVICE_FAILED)';
+    rcaVerdict = '🚨 **Root Cause Identified (Diameter Rx Policy Failure)**: ASBC rejected call with `SIP 503;text="wait offer AAA timeout(o),iCode=CC_RX_SERVICE_FAILED"`. The PCRF failed to return Diameter AA-Answer within the configured SLA window.';
+    rcaPlainEnglish = 'The call failed at the Session Border Controller (ASBC2) because the Diameter Rx interface timed out waiting for policy authorization (AAA) from the PCRF/DRA. This is a policy/charging configuration and link reachability issue.';
+    rcaRecommendations.push('Check Diameter peer connection status on ASBC: `show diameter peer-status rx`.');
+    rcaRecommendations.push('Inspect PCRF server health, CPU load, and DRA Diameter routing tables.');
+    rcaRecommendations.push('Adjust ASBC Rx request timer (`rx_aaa_timeout_ms`) or enable Rx Bypass Fallback to prevent dropping calls during policy delays.');
   } else if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
     rcaTitle = 'Root Cause Identified: Downstream Proxy / Core Server Exhaustion (SIP 503)';
     rcaVerdict = '🚨 **Root Cause Identified (Server Overload)**: Downstream SIP proxy or application server returned 503 Service Unavailable, rejecting incoming signaling sessions.';

@@ -301,7 +301,70 @@ To get rid of this issue and restore mobile data connectivity for the subscriber
       };
     }
 
-    // RCA Scenario C: Server Overload (503 Service Unavailable)
+    // RCA Scenario C: ASBC Rx Interface AAA Timeout / PCRF Policy Rejection (CC_RX_SERVICE_FAILED / SIP 503)
+    const rxPkt = packets.find(p => {
+      const full = ((p.raw_text || '') + ' ' + (p.info || '')).toLowerCase();
+      return full.includes('wait offer aaa timeout') || 
+             full.includes('cc_rx_service_failed') || 
+             full.includes('rx_service_failed') ||
+             full.includes('aaa timeout');
+    });
+
+    const isRxTimeoutQuery = queryLower.includes('wait offer aaa timeout') || 
+                             queryLower.includes('cc_rx_service_failed') || 
+                             queryLower.includes('rx_service_failed') || 
+                             queryLower.includes('asbc2') || 
+                             queryLower.includes('toberin') || 
+                             (queryLower.includes('503') && queryLower.includes('aaa'));
+
+    if (rxPkt || isRxTimeoutQuery) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA): ASBC Policy Timeout (\`CC_RX_SERVICE_FAILED\` / SIP 503)
+
+**Investigation Target**: **Session Border Controller (ASBC / SBC) & Diameter Rx Policy Gating**  
+**Executive Verdict**: 🚨 **Root Cause: Diameter Rx Interface AAA Timeout between ASBC and PCRF / DRA**
+
+---
+
+### 🔍 1. Root Cause Identification (What Went Wrong):
+* **Failing Signature**: \`SIP;cause=503;text="wait offer AAA timeout(o),iCode=CC_RX_SERVICE_FAILED"\`
+* **Protocol Failure Mechanism**:
+  1. During call initiation (\`SIP INVITE\` with SDP offer), the ASBC generates a **Diameter AA-Request (AAR)** over the **3GPP Rx interface** to the **PCRF (Policy and Charging Rules Function)** to request QoS authorization and media pinhole gating.
+  2. The ASBC starts its internal \`wait offer AAA\` timer (typically 2000ms).
+  3. The PCRF or intermediate Diameter Routing Agent (DRA) failed to respond with a **Diameter AA-Answer (AAA)** within the timer window.
+  4. The ASBC aborted the session setup and returned **\`SIP 503 Service Unavailable\`** with internal reason \`iCode=CC_RX_SERVICE_FAILED\`.
+
+---
+
+### 🛠️ 2. Step-by-Step Engineering Remediation (What the Config Team Needs to Fix):
+
+1. **Check Diameter Rx Peer Status on ASBC**:
+   - Inspect whether the Diameter TCP/SCTP peer connection to the PCRF/DRA is active:
+   \`\`\`bash
+   # On ASBC CLI:
+   show diameter peer-status rx
+   show security ipsec-tunnel rx-pcrf
+   \`\`\`
+
+2. **Inspect PCRF / DRA Health & Routing**:
+   - Check if the PCRF is experiencing high CPU load, connection pool exhaustion, or if the DRA has a broken realm route for the incoming Origin-Host.
+
+3. **Tune ASBC Rx Request Timers**:
+   - Increase the ASBC AAA response timer from **2000ms to 4000ms** to tolerate momentary carrier transit spikes:
+   \`\`\`text
+   config> session-router> diameter-profile> rx-aaa-timeout = 4000ms
+   \`\`\`
+
+4. **Enable ASBC Rx Bypass Fallback (Emergency Continuity)**:
+   - If the PCRF link is down, configure the ASBC fallback policy to **allow call establishment without PCRF gating** until the Diameter link is restored:
+   \`\`\`text
+   config> session-router> rx-policy> on-aaa-timeout = BYPASS_AND_ALLOW
+   \`\`\``,
+        provider: 'TraceIQ Autonomous ASBC Policy Diagnostician'
+      };
+    }
+
+    // RCA Scenario D: Server Overload (503 Service Unavailable)
     if (has503) {
       return {
         answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
@@ -324,7 +387,7 @@ To get rid of this issue and restore mobile data connectivity for the subscriber
       };
     }
 
-    // RCA Scenario D: Normal / Nominal Capture (No failures)
+    // RCA Scenario E: Normal / Nominal Capture (No failures)
     return {
       answer: `### 🎯 Root Cause & Health Analysis for \`${fileName}\`
 
