@@ -154,8 +154,8 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       };
     }
 
-    // Fault Signature 3: Kubernetes VIP Allocation / Pod Spawning Failure
-    if (line.includes('CrashLoopBackOff') || line.includes('VIP') && (line.includes('failed') || line.includes('timeout') || line.includes('cannot bind')) || line.includes('FailedScheduling')) {
+    // Fault Signature 3: Kubernetes VIP Allocation / Pod Spawning Failure (Strict matching)
+    if (line.includes('CrashLoopBackOff') || line.includes('FailedScheduling') || (line.toLowerCase().includes('keepalived') && line.toLowerCase().includes('failed'))) {
       isFault = true;
       level = 'CRITICAL';
       errorCount++;
@@ -229,7 +229,13 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     });
   }
 
-  if (isK8s && (rawText.toLowerCase().includes('vip') || rawText.toLowerCase().includes('crashloop'))) {
+  // Strict Fault Extraction: Only trigger K8s / Platform faults if genuine container orchestration errors exist
+  const hasGenuineK8sError = rawText.includes('CrashLoopBackOff') || 
+                             rawText.includes('FailedScheduling') || 
+                             (rawText.toLowerCase().includes('keepalived') && rawText.toLowerCase().includes('failed')) ||
+                             (rawText.toLowerCase().includes('metallb') && rawText.toLowerCase().includes('error'));
+
+  if (hasGenuineK8sError) {
     identifiedFaults.push({
       id: 'flt_k8s_vip_fail',
       title: 'Kubernetes Virtual IP / Container Initialization Blocked',
@@ -241,7 +247,11 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     });
   }
 
-  if (isRedis && (rawText.includes('READONLY') || rawText.includes('pool'))) {
+  const hasGenuineRedisError = rawText.includes('READONLY You can\'t write') || 
+                               rawText.includes('Could not get a resource from the pool') || 
+                               rawText.includes('RedisConnectionException');
+
+  if (hasGenuineRedisError) {
     identifiedFaults.push({
       id: 'flt_redis_conn_fail',
       title: 'Redis Cluster Failover or Pool Exhaustion',
