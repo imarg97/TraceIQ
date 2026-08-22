@@ -374,9 +374,10 @@ ${topFault.remediation ? `* **Remediation Details**: \`${topFault.remediation}\`
     
     // Deep scan across all packets for missing audio assets, 404s, or error.file
     const missingWavPkt = packets.find(p => {
+      if (p.protocol !== 'SIP' || !p.body) return false;
       const full = ((p.body || '') + ' ' + (p.raw_text || '')).toLowerCase();
-      if (full.includes('perfmon') || full.includes('pfmobject')) return false;
-      return full.includes('error.file') || full.includes('filenotfound') || full.includes('.wav not found') || (full.includes('msml.dialog.exit') && full.includes('404'));
+      if (full.includes('perfmon') || full.includes('pfmobject') || full.includes('setvalue key[')) return false;
+      return full.includes('error.file') || full.includes('.wav not found') || (full.includes('msml.dialog.exit') && full.includes('404'));
     });
 
     const isVmasTrace = fileName.toLowerCase().includes('vmas') || packets.some(p => p.raw_text?.includes('msml') || p.sip_method === 'INFO');
@@ -385,11 +386,11 @@ ${topFault.remediation ? `* **Remediation Details**: \`${topFault.remediation}\`
     const has408 = respCodes['408 Request Timeout'] || respCodes['408'];
     const has487 = respCodes['487 Request Terminated'] || respCodes['487'];
 
-    // RCA Scenario A: Missing Audio / WAV File in Media Server
+    // RCA Scenario A: Missing Audio / WAV File in Media Server (Only if genuinely in SIP/MSML packet)
     if (missingWavPkt) {
       const fullText = (missingWavPkt.body || '') + ' ' + (missingWavPkt.raw_text || '');
       const wavMatch = fullText.match(/([a-zA-Z0-9_\-\.\/]+\.wav)/i);
-      const wavName = wavMatch ? wavMatch[0] : 'p1510.wav';
+      const wavName = wavMatch ? wavMatch[0] : 'audio prompt file';
       const promptDir = wavName.includes('/') ? wavName.substring(0, wavName.lastIndexOf('/')) : '/var/vmas/prompts/Spanish/';
 
       return {

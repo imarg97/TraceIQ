@@ -121,6 +121,13 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
     try {
       const data = await uploadPcapFile(file);
       const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
+      
+      // If a log is already active, link it to the PCAP
+      const activeLog = get().currentLog;
+      if (activeLog) {
+        data.linked_logs = activeLog;
+      }
+
       set({ 
         currentPcap: data, 
         recentPcaps: [data, ...prevRecent].slice(0, 8),
