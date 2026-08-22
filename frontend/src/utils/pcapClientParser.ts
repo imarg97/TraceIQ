@@ -20,9 +20,9 @@ const SIP_METHODS = ['INVITE', 'REGISTER', 'ACK', 'BYE', 'CANCEL', 'OPTIONS', 'P
 export function cleanSipString(raw: string): { isSip: boolean; cleanText: string } {
   if (!raw) return { isSip: false, cleanText: '' };
 
-  // 1. Direct regex match for SIP Request or Response lines
-  const requestRegex = new RegExp(`(?:^|[\\r\\n\\x00-\\x1f\\s])(${SIP_METHODS.join('|')})\\s+([^\\r\\n]+)\\s+(SIP\\/2\\.0)`, 'i');
-  const responseRegex = /(?:^|[\r\n\x00-\x1f\s])(SIP\/2\.0)\s+(\d{3})\s+([^\r\n]*)/i;
+  // 1. Strict regex match for standard SIP Request or Response line at word boundary / start
+  const requestRegex = new RegExp(`(?:^|[\\r\\n])(${SIP_METHODS.join('|')})\\s+([^\\r\\n]+)\\s+(SIP\\/2\\.0)(?:[\\r\\n]|$)`, 'i');
+  const responseRegex = /(?:^|[\r\n])(SIP\/2\.0)\s+(\d{3})\s+([^\r\n]*)(?:[\r\n]|$)/i;
 
   const reqMatch = raw.match(requestRegex);
   const respMatch = raw.match(responseRegex);
@@ -32,30 +32,21 @@ export function cleanSipString(raw: string): { isSip: boolean; cleanText: string
   if (reqMatch && reqMatch.index !== undefined) {
     const matchStr = reqMatch[0];
     const firstChar = matchStr[0];
-    const offset = (firstChar === '\r' || firstChar === '\n' || firstChar === ' ' || firstChar.charCodeAt(0) < 32) ? 1 : 0;
+    const offset = (firstChar === '\r' || firstChar === '\n') ? 1 : 0;
     startIndex = reqMatch.index + offset;
   } else if (respMatch && respMatch.index !== undefined) {
     const matchStr = respMatch[0];
     const firstChar = matchStr[0];
-    const offset = (firstChar === '\r' || firstChar === '\n' || firstChar === ' ' || firstChar.charCodeAt(0) < 32) ? 1 : 0;
+    const offset = (firstChar === '\r' || firstChar === '\n') ? 1 : 0;
     startIndex = respMatch.index + offset;
-  } else if (raw.includes('SIP/2.0') || raw.includes('Call-ID:') || raw.includes('CSeq:')) {
-    // Fallback: search for any SIP method or SIP/2.0 anywhere in payload
-    for (const m of SIP_METHODS) {
-      const idx = raw.indexOf(m + ' ');
-      if (idx !== -1 && (startIndex === -1 || idx < startIndex)) {
-        startIndex = idx;
-      }
-    }
-    const sipVerIdx = raw.indexOf('SIP/2.0');
-    if (sipVerIdx !== -1 && (startIndex === -1 || sipVerIdx < startIndex)) {
-      startIndex = sipVerIdx;
-    }
   }
 
   if (startIndex !== -1) {
-    const cleanText = raw.substring(startIndex).trim();
-    return { isSip: true, cleanText };
+    // Sanity check: Ensure clean text has recognizable SIP headers
+    const candidate = raw.substring(startIndex).trim();
+    if (candidate.includes('Call-ID:') || candidate.includes('From:') || candidate.includes('To:') || candidate.includes('CSeq:') || candidate.includes('Via:')) {
+      return { isSip: true, cleanText: candidate };
+    }
   }
 
   return { isSip: false, cleanText: raw };
@@ -593,12 +584,12 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 2: Deep Payload Scanner: Missing Audio Prompt / Media Files (WAV / MSML 404 / error.file) - ONLY if genuinely detected in payload
+  // Issue 2: Deep Payload Scanner: Missing Audio Prompt / Media Files (WAV / MSML 404 / error.file) - ONLY if genuinely detected in SIP/MSML payload
   const missingFilePacket = packets.find(p => {
+    if (p.protocol !== 'SIP' || !p.body) return false;
     const full = ((p.body || '') + ' ' + (p.raw_text || '')).toLowerCase();
-    if (full.includes('perfmon') || full.includes('pfmobject')) return false;
+    if (full.includes('perfmon') || full.includes('pfmobject') || full.includes('setvalue key[')) return false;
     return full.includes('error.file') || 
-           full.includes('file not found') || 
            full.includes('.wav not found') || 
            full.includes('filenotfound') || 
            (full.includes('msml.dialog.exit') && (full.includes('status="404"') || full.includes('status="400"')));
