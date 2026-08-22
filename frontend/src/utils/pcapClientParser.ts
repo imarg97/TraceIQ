@@ -624,17 +624,18 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 3: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures
-  const hasPacoFailure = packets.some(p => {
+  // Issue 3: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures (Only for genuine PACO / GTP / 5GC traces)
+  const hasPacoFailure = isPacoTrace && packets.some(p => {
     const txt = (p.raw_text || '').toLowerCase();
-    return txt.includes('context not found') || 
-           txt.includes('no resources available') || 
-           txt.includes('service denied') || 
-           txt.includes('esm failure') || 
-           txt.includes('dnn not supported') || 
-           txt.includes('plmn not allowed') || 
-           txt.includes('diameter_user_unknown') || 
-           txt.includes('diameter_authorization_rejected');
+    return (p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP') && 
+           (txt.includes('context not found') || 
+            txt.includes('no resources available') || 
+            txt.includes('service denied') || 
+            txt.includes('esm failure') || 
+            txt.includes('dnn not supported') || 
+            txt.includes('plmn not allowed') || 
+            txt.includes('diameter_user_unknown') || 
+            txt.includes('diameter_authorization_rejected'));
   });
 
   if (hasPacoFailure) {
@@ -647,6 +648,32 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
       possible_cause: 'Subscriber subscription not found in HSS/UDM, APN/DNN mismatch, PCRF policy rejection, or UPF/PGW user plane IP pool exhaustion.',
       recommendation: '1. Inspect subscriber provisioning in HSS/UDM for APN/DNN authorization.\n2. Verify PCRF/PCF QoS rules and Gx/N7 interface health.\n3. Check SGW/PGW or UPF IP pool capacity.',
       rfc_reference: '3GPP TS 29.274 (GTPv2-C Causes), 3GPP TS 24.301 (LTE NAS Causes), 3GPP TS 24.501 (5G NAS Causes)'
+    });
+  }
+
+  // Issue 3B: External Multi-Vendor Equipment & Interop Diagnostics (Nokia, Lucent/Alcatel, Ericsson, Huawei, Oracle)
+  const externalVendorsDetected = new Set<string>();
+  for (const p of packets) {
+    const raw = (p.raw_text || '') + ' ' + (p.user_agent || '');
+    if (raw.includes('LucentPCSF') || raw.includes('Lucent')) externalVendorsDetected.add('Nokia / Alcatel-Lucent P-CSCF');
+    if (raw.includes('P-NOKIA') || raw.includes('P-NokiaSiemens') || raw.includes('NSN')) externalVendorsDetected.add('Nokia Siemens Networks (NSN) Core');
+    if (raw.includes('Ericsson') || raw.includes('MTAS') || raw.includes('SBG')) externalVendorsDetected.add('Ericsson IMS / Telephony AS');
+    if (raw.includes('Huawei')) externalVendorsDetected.add('Huawei Core');
+    if (raw.includes('Oracle') || raw.includes('Acme Packet')) externalVendorsDetected.add('Oracle Acme Packet SBC');
+  }
+
+  if (externalVendorsDetected.size > 0 && isVmasTrace) {
+    const vendorsList = Array.from(externalVendorsDetected).join(', ');
+    issues.push({
+      id: 'iss_ext_vendor_interop',
+      title: `Multi-Vendor IMS Interoperability (${vendorsList})`,
+      severity: 'LOW',
+      category: 'External Multi-Vendor Equipment',
+      affected_call_id: 'External Inbound Routing',
+      description: `Signaling headers indicate active inter-working with third-party vendor network equipment: **${vendorsList}**. Observed proprietary charging & session headers (\`P-NokiaSiemens.Session-Info\`, \`P-NOKIA.Traffica\`, \`LucentPCSF\`).`,
+      possible_cause: 'Heterogeneous carrier architecture where the IMS Core / P-CSCF / MRF is supplied by Nokia/Alcatel-Lucent while the Application Server is Mavenir VMAS.',
+      recommendation: 'Ensure custom SIP header stripping or inter-op parameter normalization (e.g. SDP mode-change-capability) is aligned between the Nokia P-CSCF/SBC and the Mavenir VMAS application server.',
+      rfc_reference: '3GPP TS 24.229 (IMS Call Control), RFC 3261'
     });
   }
 
