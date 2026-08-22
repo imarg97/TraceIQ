@@ -28,11 +28,17 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
   let isVmas = false;
   let isK8s = false;
   let isRedis = false;
+  // Precompiled Regexes for maximum scanning performance across 500k+ line files
+  const MAV_REGEX = /^<(\d{2}:\d{2}:\d{2}(?:\.\d+)?)?\s*(\*?[A-Z]+\*?)\s+([A-Z0-9_\-]+)\s+([\d:]+)\s*[^>]*>(?:<([^>]+)>)?(?:\[([^\]]+)\])?\s*(.*)$/i;
+  const K8S_REGEX = /^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?[Z\d:]*)?\s*(?:\[([^\]]+)\])?\s*(ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL)?\s*:?\s*(.*)$/i;
+  const CID_REGEX = /(?:Call-ID|pCallid|CallId|call_id)[:=\s]+([a-zA-Z0-9_\-\.@]+)/i;
+  const PHONE_REGEX = /(?:\+?[0-9]{10,14})/;
+  const WAV_REGEX = /(P\d+\.wav|[a-zA-Z0-9_\-]+\.wav)/ig;
 
-  // Step 1: Parse Line by Line
+  // Step 1: Parse Line by Line (High-Performance Single Pass)
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+    const line = lines[i];
+    if (!line || line.length < 3) continue;
 
     let timestamp = '';
     let level: 'CRITICAL' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' = 'INFO';
@@ -44,34 +50,35 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     let callId: string | undefined;
     let msisdn: string | undefined;
 
-    // Pattern A: Mavenir / Carrier C++ Log format: <09:54:23.689 DBG SIP 1464:1798 0:0><:v007:>[Method(File.cpp:Line)] message
-    const mavMatch = line.match(/^<(\d{2}:\d{2}:\d{2}(?:\.\d+)?)?\s*(\*?[A-Z]+\*?)\s+([A-Z0-9_\-]+)\s+([\d:]+)\s*[^>]*>(?:<([^>]+)>)?(?:\[([^\]]+)\])?\s*(.*)$/i);
-
-    if (mavMatch) {
+    // Fast-path Pattern A: Mavenir C++ (<09:54:23.689 ...)
+    if (line.charCodeAt(0) === 60 /* '<' */) {
       isVmas = true;
-      timestamp = mavMatch[1] || '';
-      const rawLvl = (mavMatch[2] || '').replace(/\*/g, '').toUpperCase();
-      module = mavMatch[3] || 'VMAS';
-      pidTid = mavMatch[4] || '';
-      sourceFileLine = mavMatch[6] || '';
-      message = mavMatch[7] || line;
+      const mavMatch = line.match(MAV_REGEX);
+      if (mavMatch) {
+        timestamp = mavMatch[1] || '';
+        const rawLvl = (mavMatch[2] || '').replace(/\*/g, '').toUpperCase();
+        module = mavMatch[3] || 'VMAS';
+        pidTid = mavMatch[4] || '';
+        sourceFileLine = mavMatch[6] || '';
+        message = mavMatch[7] || line;
 
-      if (rawLvl.includes('ERR') || rawLvl.includes('FATAL') || rawLvl.includes('CRI')) {
-        level = 'ERROR';
-        errorCount++;
-      } else if (rawLvl.includes('WRN') || rawLvl.includes('WARN')) {
-        level = 'WARN';
-        warnCount++;
-      } else if (rawLvl.includes('DBG') || rawLvl.includes('TRC')) {
-        level = 'DEBUG';
-      } else {
-        level = 'INFO';
-        infoCount++;
+        if (rawLvl.includes('ERR') || rawLvl.includes('FATAL') || rawLvl.includes('CRI')) {
+          level = 'ERROR';
+          errorCount++;
+        } else if (rawLvl.includes('WRN') || rawLvl.includes('WARN')) {
+          level = 'WARN';
+          warnCount++;
+        } else if (rawLvl.includes('DBG') || rawLvl.includes('TRC')) {
+          level = 'DEBUG';
+        } else {
+          level = 'INFO';
+          infoCount++;
+        }
       }
     } 
-    // Pattern B: Kubernetes / Container / Generic ISO format: 2026-08-22T09:54:23.689Z ERROR [pod-name] message
-    else {
-      const k8sMatch = line.match(/^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?[Z\d:]*)?\s*(?:\[([^\]]+)\])?\s*(ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL)?\s*:?\s*(.*)$/i);
+    // Fast-path Pattern B: ISO / Standard Log (starts with digit '2')
+    else if (line.charCodeAt(0) >= 48 && line.charCodeAt(0) <= 57 && line.length > 20) {
+      const k8sMatch = line.match(K8S_REGEX);
       if (k8sMatch) {
         timestamp = k8sMatch[1] || '';
         module = k8sMatch[2] || (line.includes('kube') || line.includes('pod') ? 'KUBERNETES' : 'APP');
@@ -93,25 +100,28 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       }
     }
 
-    // Inspect Content for Identifiers
-    // Call-IDs
-    const cidMatch = line.match(/(?:Call-ID|pCallid|CallId|call_id)[:=\s]+([a-zA-Z0-9_\-\.@]+)/i);
-    if (cidMatch) {
-      callId = cidMatch[1];
-      callIdsSet.add(callId);
+    // Fast-path Identifier Extraction
+    if (callIdsSet.size < 50 && (line.includes('Call-ID') || line.includes('call_id') || line.includes('CallId'))) {
+      const cidMatch = line.match(CID_REGEX);
+      if (cidMatch) {
+        callId = cidMatch[1];
+        callIdsSet.add(callId);
+      }
     }
 
-    // Phone numbers (MSISDN)
-    const phoneMatch = line.match(/(?:\+?[0-9]{10,14})/);
-    if (phoneMatch && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart') || line.includes('From:') || line.includes('To:'))) {
-      msisdn = phoneMatch[0];
-      phoneNumbersSet.add(msisdn);
+    if (phoneNumbersSet.size < 50 && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart'))) {
+      const phoneMatch = line.match(PHONE_REGEX);
+      if (phoneMatch) {
+        msisdn = phoneMatch[0];
+        phoneNumbersSet.add(msisdn);
+      }
     }
 
-    // WAV Audio Prompts
-    const wavMatch = line.match(/(P\d+\.wav|[a-zA-Z0-9_\-]+\.wav)/ig);
-    if (wavMatch) {
-      wavMatch.forEach(w => wavPromptsSet.add(w));
+    if (wavPromptsSet.size < 50 && line.includes('.wav')) {
+      const wavMatch = line.match(WAV_REGEX);
+      if (wavMatch) {
+        wavMatch.forEach(w => wavPromptsSet.add(w));
+      }
     }
 
     // Pods / VIPs

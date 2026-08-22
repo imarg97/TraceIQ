@@ -356,7 +356,15 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                     <ShieldCheck className="w-3.5 h-3.5 text-ag-primary" />
                     <span>Technical Verdict</span>
                   </div>
-                  <p>{formatInlineMarkdown(currentLog?.root_cause || currentPcap?.ai_analysis?.root_cause || currentPcap?.ai_analysis?.executive_summary || 'System executed nominal transactions.')}</p>
+                  <p>{formatInlineMarkdown(
+                    (currentLog?.identified_faults && currentLog.identified_faults.length > 0)
+                      ? currentLog.root_cause
+                      : (currentPcap?.linked_logs?.identified_faults && currentPcap.linked_logs.identified_faults.length > 0)
+                        ? currentPcap.linked_logs.root_cause
+                        : (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW')
+                          ? `🚨 **${currentPcap.issues[0].title}**: ${currentPcap.issues[0].description} **Recommended Remediation**: ${currentPcap.issues[0].recommendation}`
+                          : (currentPcap?.ai_analysis?.root_cause || currentPcap?.ai_analysis?.executive_summary || 'System executed nominal transactions with zero signaling faults.')
+                  )}</p>
                 </div>
 
                 {/* Prescribed Solutions & Action Items */}
@@ -365,7 +373,15 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                     Recommended Actions & Remediation
                   </div>
                   <div className="space-y-1.5">
-                    {(currentLog?.action_plan || currentPcap?.ai_analysis?.recommendations || ['Verify standard service metrics.']).map((rec, rIdx) => (
+                    {(
+                      (currentLog?.action_plan && currentLog.action_plan.length > 0)
+                        ? currentLog.action_plan
+                        : (currentPcap?.linked_logs?.action_plan && currentPcap.linked_logs.action_plan.length > 0)
+                          ? currentPcap.linked_logs.action_plan
+                          : (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW')
+                            ? [currentPcap.issues[0].recommendation]
+                            : (currentPcap?.ai_analysis?.recommendations || ['Verify standard service metrics.'])
+                    ).map((rec, rIdx) => (
                       <div key={rIdx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 font-sans">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                         <span className="leading-snug">{formatInlineMarkdown(rec)}</span>
