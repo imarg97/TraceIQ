@@ -245,6 +245,14 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
     setTimeout(() => setCopiedBrief(false), 2000);
   };
 
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+
+  const handleCopyMessage = (msgId: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(msgId);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
   return (
     <div className="flex-1 flex flex-col p-4 md:p-6 gap-5 overflow-y-auto max-w-7xl mx-auto w-full font-sans min-h-full pb-16">
       
@@ -286,7 +294,7 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
       </div>
 
       {/* Main 2-Column Split */}
-      <div ref={aiContainerRef} className="flex-1 flex flex-col lg:flex-row gap-2 items-stretch select-none">
+      <div ref={aiContainerRef} className="flex-1 flex flex-col lg:flex-row gap-2 items-stretch">
         
         {/* Left Column: Box 1 (Root Cause & Diagnostics + Customer Brief) */}
         <div 
@@ -337,7 +345,7 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
             {/* View Mode Content */}
             {viewMode === 'CUSTOMER_READY' ? (
               <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 space-y-2 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans">
+                <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 space-y-2 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans select-text">
                   <div className="font-bold text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5 text-xs uppercase tracking-wider">
                     <Briefcase className="w-4 h-4" />
                     <span>Customer-Facing Summary (Ready for Email)</span>
@@ -349,7 +357,7 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                 </div>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-4 select-text">
                 {/* Narrative & Assessment */}
                 <div className="text-xs font-sans text-slate-700 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/40 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-2">
                   <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
@@ -410,11 +418,11 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
           className="bg-white dark:bg-ag-darkCard rounded-2xl border border-slate-200 dark:border-ag-darkBorder flex flex-col shadow-xs overflow-hidden h-[660px] min-w-[320px]"
         >
           {/* Chat Messages Log */}
-          <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-4">
+          <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-4 select-text">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-3 group/msg ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {msg.sender === 'ai' && (
                   <div className="w-7 h-7 rounded-lg bg-ag-primary/10 border border-ag-primary/30 flex items-center justify-center text-ag-primary shrink-0 mt-1">
@@ -423,23 +431,54 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                 )}
 
                 <div
-                  className={`max-w-[85%] rounded-2xl p-4 text-xs ${
+                  className={`max-w-[88%] rounded-2xl p-4 text-xs relative select-text ${
                     msg.sender === 'user'
                       ? 'bg-ag-primary text-black font-medium rounded-br-none shadow-glow-primary'
                       : 'bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-slate-800 dark:text-slate-200 rounded-bl-none shadow-xs'
                   }`}
                 >
+                  {/* Message Action Header for AI messages: Copy Button */}
+                  {msg.sender === 'ai' && (
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/50 pb-2 mb-2">
+                      <span className="text-[10px] font-mono font-bold text-ag-primary flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" />
+                        AI Analysis
+                      </span>
+                      <button
+                        onClick={() => handleCopyMessage(msg.id, msg.text)}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:border-ag-primary hover:text-ag-primary text-slate-600 dark:text-slate-300 transition-all shadow-2xs cursor-pointer"
+                        title="Copy entire AI response to clipboard"
+                      >
+                        {copiedMsgId === msg.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span className="text-emerald-500">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {msg.sender === 'user' ? (
                     <p className="leading-relaxed font-sans">{msg.text}</p>
                   ) : (
                     renderFormattedText(msg.text)
                   )}
+
                   <div
-                    className={`text-[9px] mt-2 font-mono ${
-                      msg.sender === 'user' ? 'text-black/60 text-right' : 'text-slate-400'
+                    className={`text-[9px] mt-2 font-mono flex items-center justify-between ${
+                      msg.sender === 'user' ? 'text-black/60 justify-end' : 'text-slate-400'
                     }`}
                   >
-                    {msg.timestamp}
+                    <span>{msg.timestamp}</span>
+                    {msg.sender === 'ai' && (
+                      <span className="text-[9px] text-slate-400 opacity-60">Highlight text to select & copy</span>
+                    )}
                   </div>
                 </div>
 
