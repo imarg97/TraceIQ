@@ -17,6 +17,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
   const { 
     currentPcap, 
+    currentLog,
     activeTab, 
     setActiveTab, 
     clearCapture, 
@@ -35,12 +36,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
     { id: 'explorer', label: 'Explorer' },
     { id: 'callflow', label: 'Call Flow' },
     { id: 'issues', label: 'Issues' },
+    { id: 'logs', label: 'Logs' },
     { id: 'ai', label: 'AI' },
     { id: 'compare', label: 'Compare' },
   ];
 
   const handleLogoClick = () => {
-    if (currentPcap) {
+    if (currentPcap || currentLog) {
       setActiveTab('dashboard');
     }
   };
@@ -71,21 +73,32 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
         </div>
         
         {/* Navigation Tabs */}
-        {currentPcap && (
+        {(currentPcap || currentLog) && (
           <nav className="hidden md:flex gap-6 h-full items-center">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`font-heading text-xs font-bold uppercase tracking-wider py-4 transition-colors relative ${
-                  activeTab === tab.id 
-                    ? 'text-ag-primary border-b-2 border-ag-primary' 
-                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-ag-primary'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map(tab => {
+              // Hide PCAP-specific tabs if only log is loaded
+              if (!currentPcap && (tab.id === 'callflow' || tab.id === 'explorer' || tab.id === 'compare')) {
+                return null;
+              }
+              // Hide Logs tab if only PCAP is loaded and no log
+              if (!currentLog && tab.id === 'logs') {
+                return null;
+              }
+
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`font-heading text-xs font-bold uppercase tracking-wider py-4 transition-colors relative ${
+                    activeTab === tab.id 
+                      ? 'text-ag-primary border-b-2 border-ag-primary' 
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-ag-primary'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </nav>
         )}
       </div>

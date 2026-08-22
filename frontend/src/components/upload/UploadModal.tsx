@@ -160,7 +160,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
             >
               <input
                 type="file"
-                accept=".pcap,.pcapng,.cap"
+                accept=".pcap,.pcapng,.cap,.alogc,.log,.txt,.csv"
                 onChange={handleFileChange}
                 className="hidden"
                 id="modal-pcap-upload"
@@ -171,10 +171,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
                 </div>
                 <div>
                   <span className="text-sm font-bold tcq-text-title block font-heading">
-                    Drop Voicemail or Carrier PCAP file here
+                    Drop PCAP, PCAPNG, or Log File (.alogc, .log, .txt) here
                   </span>
                   <span className="text-xs tcq-text-muted mt-0.5 block font-medium">
-                    Supports up to 500MB with C-speed binary packet demuxing
+                    Supports 500MB+ captures and C++/Kubernetes application debug logs
                   </span>
                 </div>
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-xs">

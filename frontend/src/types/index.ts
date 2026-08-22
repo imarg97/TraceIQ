@@ -110,7 +110,53 @@ export interface PCAPAnalysisResult {
     recommendations: string[];
     timeline_summary?: string[];
     plain_english?: string;
+    customer_ready_brief?: string;
   };
+  linked_logs?: LogAnalysisResult | null;
+}
+
+export interface LogEntry {
+  id: string;
+  index: number;
+  timestamp: string;
+  level: 'CRITICAL' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
+  module: string;
+  component?: string;
+  pid_tid?: string;
+  source_file_line?: string;
+  message: string;
+  raw_line: string;
+  call_id?: string;
+  msisdn?: string;
+  is_fault: boolean;
+  fault_details?: {
+    title: string;
+    root_cause: string;
+    solution: string;
+    sugarcoated_summary: string;
+  };
+}
+
+export interface LogAnalysisResult {
+  file_name: string;
+  file_size_bytes: number;
+  total_lines: number;
+  log_type: 'MAVENIR_VMAS' | 'KUBERNETES_OCP' | 'REDIS_DB' | 'SIP_IMS' | 'GENERIC_APPLICATION';
+  error_count: number;
+  warn_count: number;
+  info_count: number;
+  entries: LogEntry[];
+  identified_faults: IssueEngineItem[];
+  discovered_identifiers: {
+    call_ids: string[];
+    phone_numbers: string[];
+    prompt_wavs: string[];
+    pods_or_vips: string[];
+  };
+  executive_summary: string;
+  root_cause: string;
+  customer_ready_brief: string;
+  action_plan: string[];
 }
 
 export interface SamplePCAPItem {
@@ -138,3 +184,4 @@ export interface PCAPCompareResult {
   what_changed: string;
   risk_assessment?: string;
 }
+

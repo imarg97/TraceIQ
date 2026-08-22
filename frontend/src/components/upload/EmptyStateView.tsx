@@ -84,7 +84,7 @@ export const EmptyStateView: React.FC<EmptyStateViewProps> = ({ onFileSelect, is
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept=".pcap,.pcapng,application/vnd.tcpdump.pcap"
+          accept=".pcap,.pcapng,.alogc,.log,.txt,.csv,application/vnd.tcpdump.pcap"
           className="hidden"
         />
 
@@ -94,8 +94,12 @@ export const EmptyStateView: React.FC<EmptyStateViewProps> = ({ onFileSelect, is
           <Cloud className="w-12 h-12 text-ag-primary" />
         </div>
         
-        <h1 className="font-heading text-3xl font-bold mb-3 tracking-tight text-slate-900 dark:text-slate-100">Drag & Drop PCAP File Here</h1>
-        <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm">Supports .pcap, .pcapng files up to 500MB</p>
+        <h1 className="font-heading text-3xl font-bold mb-3 tracking-tight text-slate-900 dark:text-slate-100">
+          Drag & Drop PCAP or Log File Here
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 mb-8 text-sm">
+          Supports <strong className="text-ag-primary">.pcap, .pcapng</strong> and application logs <strong className="text-indigo-500">.alogc, .log, .txt</strong> up to 500MB
+        </p>
         
         <button 
           onClick={() => fileInputRef.current?.click()}
@@ -104,11 +108,11 @@ export const EmptyStateView: React.FC<EmptyStateViewProps> = ({ onFileSelect, is
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
-              <Upload className="w-5 h-5 animate-bounce" /> Processing...
+              <Upload className="w-5 h-5 animate-bounce" /> Processing Capture & Logs...
             </span>
           ) : (
             <span className="flex items-center gap-2">
-              <Upload className="w-5 h-5" /> Browse Files from Computer
+              <Upload className="w-5 h-5" /> Browse PCAP / Logs from Computer
             </span>
           )}
         </button>

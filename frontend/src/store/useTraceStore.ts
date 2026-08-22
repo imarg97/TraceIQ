@@ -1,16 +1,18 @@
 import { create } from 'zustand';
-import { PCAPAnalysisResult, PacketInfo, PCAPCompareResult } from '../types';
-import { loadSamplePcap, uploadPcapFile, comparePcaps as apiComparePcaps } from '../services/api';
+import { PCAPAnalysisResult, PacketInfo, PCAPCompareResult, LogAnalysisResult } from '../types';
+import { loadSamplePcap, uploadPcapFile, uploadLogFile, comparePcaps as apiComparePcaps } from '../services/api';
 
-export type ActiveTab = 'dashboard' | 'callflow' | 'explorer' | 'issues' | 'ai' | 'compare';
+export type ActiveTab = 'dashboard' | 'callflow' | 'explorer' | 'issues' | 'logs' | 'ai' | 'compare';
 export type ThemeMode = 'dark' | 'light';
 
 interface TraceStoreState {
   activeTab: ActiveTab;
   themeMode: ThemeMode;
   currentPcap: PCAPAnalysisResult | null;
+  currentLog: LogAnalysisResult | null;
   pcapB: PCAPAnalysisResult | null;
   recentPcaps: PCAPAnalysisResult[];
+  recentLogs: LogAnalysisResult[];
   compareResult: PCAPCompareResult | null;
   selectedPacket: PacketInfo | null;
   searchFilter: string;
@@ -25,7 +27,10 @@ interface TraceStoreState {
   toggleThemeMode: () => void;
   loadSample: (sampleId: string) => Promise<void>;
   uploadFile: (file: File) => Promise<void>;
+  uploadLog: (file: File) => Promise<void>;
+  uploadUnified: (pcapFile?: File, logFile?: File) => Promise<void>;
   switchPcap: (pcap: PCAPAnalysisResult) => void;
+  switchLog: (log: LogAnalysisResult) => void;
   setSelectedPacket: (packet: PacketInfo | null) => void;
   setSearchFilter: (filter: string) => void;
   setProtocolFilter: (proto: string) => void;
@@ -64,8 +69,10 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   activeTab: 'dashboard',
   themeMode: 'light',
   currentPcap: null,
+  currentLog: null,
   pcapB: null,
   recentPcaps: [],
+  recentLogs: [],
   compareResult: null,
   selectedPacket: null,
   searchFilter: '',
@@ -104,6 +111,12 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   },
 
   uploadFile: async (file: File) => {
+    const isLog = file.name.endsWith('.alogc') || file.name.endsWith('.log') || file.name.endsWith('.txt') || file.name.endsWith('.csv');
+    if (isLog) {
+      await get().uploadLog(file);
+      return;
+    }
+
     set({ isLoading: true, error: null, selectedPacket: null, searchFilter: '', protocolFilter: 'ALL', compareResult: null });
     try {
       const data = await uploadPcapFile(file);
@@ -119,6 +132,57 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
     }
   },
 
+  uploadLog: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const logData = await uploadLogFile(file);
+      const prevLogs = get().recentLogs.filter(l => l.file_name !== logData.file_name);
+      
+      // If PCAP is already present, link them
+      const curPcap = get().currentPcap;
+      if (curPcap) {
+        curPcap.linked_logs = logData;
+      }
+
+      set({
+        currentLog: logData,
+        recentLogs: [logData, ...prevLogs].slice(0, 8),
+        activeTab: 'logs',
+        isLoading: false
+      });
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to analyze log file', isLoading: false });
+    }
+  },
+
+  uploadUnified: async (pcapFile?: File, logFile?: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      let pcapData: PCAPAnalysisResult | null = null;
+      let logData: LogAnalysisResult | null = null;
+
+      if (pcapFile) {
+        pcapData = await uploadPcapFile(pcapFile);
+      }
+      if (logFile) {
+        logData = await uploadLogFile(logFile);
+      }
+
+      if (pcapData && logData) {
+        pcapData.linked_logs = logData;
+      }
+
+      set({
+        currentPcap: pcapData || get().currentPcap,
+        currentLog: logData || get().currentLog,
+        activeTab: pcapData ? 'dashboard' : 'logs',
+        isLoading: false
+      });
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to process capture and log files', isLoading: false });
+    }
+  },
+
   switchPcap: (pcap: PCAPAnalysisResult) => {
     set({
       currentPcap: pcap,
@@ -126,6 +190,14 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
       searchFilter: '',
       protocolFilter: 'ALL',
       compareResult: null,
+      error: null
+    });
+  },
+
+  switchLog: (log: LogAnalysisResult) => {
+    set({
+      currentLog: log,
+      activeTab: 'logs',
       error: null
     });
   },
@@ -152,6 +224,7 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
 
   clearCapture: () => set({
     currentPcap: null,
+    currentLog: null,
     selectedPacket: null,
     pcapB: null,
     compareResult: null,

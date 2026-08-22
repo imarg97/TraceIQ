@@ -7,9 +7,12 @@ import { SIPExplorerView } from './components/explorer/SIPExplorerView';
 import { IssueEngineView } from './components/issues/IssueEngineView';
 import { AICopilotView } from './components/ai/AICopilotView';
 import { CompareView } from './components/compare/CompareView';
+import { LogsExplorerView } from './components/logs/LogsExplorerView';
 import { EmptyStateView } from './components/upload/EmptyStateView';
+import { UploadModal } from './components/upload/UploadModal';
 import { ReportModal } from './components/report/ReportModal';
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -66,7 +69,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 export function App() {
-  const { activeTab, currentPcap, uploadFile, isLoading, error, themeMode } = useTraceStore();
+  const { activeTab, currentPcap, currentLog, uploadFile, isLoading, error, themeMode } = useTraceStore();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   return (
@@ -85,10 +88,10 @@ export function App() {
               </div>
               <div className="text-center space-y-1">
                 <span className="text-sm font-bold text-ag-primary block font-heading">
-                  Parsing Packet Capture & Signaling Flow...
+                  Parsing Captures & Application Logs...
                 </span>
                 <span className="text-xs text-slate-500 font-medium">
-                  Extracting SIP dialogs, SDP media codecs, and IMS core lifelines
+                  Dissecting SIP dialogs, MSML scripts, C++ exceptions, and VIP pod scheduling
                 </span>
               </div>
             </div>
@@ -100,10 +103,10 @@ export function App() {
                 onClick={() => setIsUploadOpen(true)}
                 className="px-4 py-2 rounded-lg bg-ag-primary hover:bg-ag-primary/90 text-black text-xs font-bold font-heading shadow-glow-primary active:scale-95 transition-all"
               >
-                Try Another PCAP File
+                Try Another File
               </button>
             </div>
-          ) : !currentPcap ? (
+          ) : (!currentPcap && !currentLog) ? (
             <EmptyStateView 
               onFileSelect={async (file) => {
                 await uploadFile(file);
@@ -117,6 +120,7 @@ export function App() {
               {activeTab === 'callflow' && <CallFlowView />}
               {activeTab === 'explorer' && <SIPExplorerView />}
               {activeTab === 'issues' && <IssueEngineView />}
+              {activeTab === 'logs' && <LogsExplorerView />}
               {activeTab === 'ai' && <AICopilotView />}
               {activeTab === 'compare' && <CompareView />}
             </div>
@@ -124,6 +128,7 @@ export function App() {
         </main>
 
         {/* Modals */}
+        <UploadModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} />
         <ReportModal />
       </div>
     </div>
