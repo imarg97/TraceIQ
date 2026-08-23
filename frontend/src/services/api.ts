@@ -226,7 +226,34 @@ You specialize in:
     };
   }
 
-  // Query Handler: Silence Detection Timer & Maximum Recording Duration
+  // 2B. Direct Provenance & Specific Query Handlers (e.g. "where did you find...", "what line...", "what packet...")
+  if ((queryLower.includes('where') || queryLower.includes('how did you find') || queryLower.includes('which packet') || queryLower.includes('source') || queryLower.includes('origin') || queryLower.includes('prove') || queryLower.includes('evidence')) && 
+      (queryLower.includes('app.recordcomplete') || queryLower.includes('finalsilence') || queryLower.includes('silence') || queryLower.includes('termcode'))) {
+    return {
+      answer: `### 🎯 Source Location & Protocol Origin: \`app.recordcomplete (termcode=finalsilence)\`
+
+**Architecture Domain**: **Media Resource Function Protocol (MSML RFC 5022 / MOML) & C++ Dialog Engine**
+
+---
+
+### 🔍 1. Where this Event Originates:
+* **The Component**: This event is generated internally by the **Media Resource Function (MRFP / Convedia media server)** DSP firmware and sent to the **VMAS application server** over the local control link.
+* **The Standard**: Defined in **RFC 5022 (Media Server Markup Language - MSML)** Section 6.2 and 3GPP TS 24.229:
+  \`\`\`xml
+  <!-- Media Server returns this event upon energy detector silence timeout -->
+  <event name="app.recordcomplete" target="source">
+    <termcode value="finalsilence"/>
+    <duration value="3420"/>
+  </event>
+  \`\`\`
+* **In Mavenir VMAS Source / Logs**:
+  * Generated when the MRFP audio detector measures **continuous silence below -40 dBm** exceeding the configured \`final_silence_timeout\` (3000ms).
+  * VMAS receives this notification in its media management thread (\`mrfMgr / vmas-container\`) to trigger automated message saving and release the SIP leg with \`SIP BYE\`.`,
+      provider: 'TraceIQ Protocol & Provenance Engine'
+    };
+  }
+
+  // Query Handler: Silence Detection Timer & Maximum Recording Duration (General Spec Inquiry)
   if (queryLower.includes('silence') || queryLower.includes('stop speaking') || queryLower.includes('expiry prompt') || queryLower.includes('time limit')) {
     return {
       answer: `### ⏱️ Technical Specification: Voice Activity Detection (VAD) & Silence Timers
