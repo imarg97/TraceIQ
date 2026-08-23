@@ -782,10 +782,16 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaPlainEnglish = 'The call timed out because the destination endpoint or firewall did not respond to signaling packets.';
     rcaRecommendations.push('Check firewall rules and NAT pinholing for UDP port 5060 between SBC and core.');
     rcaRecommendations.push('Verify destination subscriber registration state in HSS/UDM.');
-  } else if (hasPacoFailure || fileName.toLowerCase().includes('paco') || fileName.toLowerCase().includes('epc') || fileName.toLowerCase().includes('5gc')) {
+  } else if (isPacoTrace && (hasPacoFailure || fileName.toLowerCase().includes('paco') || fileName.toLowerCase().includes('epc') || fileName.toLowerCase().includes('5gc'))) {
     const pacoErrPacket = packets.find(p => {
       const txt = (p.raw_text || '').toLowerCase();
-      return txt.includes('context not found') || txt.includes('no resources') || txt.includes('denied') || txt.includes('esm failure') || txt.includes('dnn not supported') || txt.includes('diameter_user_unknown');
+      return (p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP') && (
+             txt.includes('context not found') || 
+             txt.includes('no resources') || 
+             txt.includes('service denied') || 
+             txt.includes('esm failure') || 
+             txt.includes('dnn not supported') || 
+             txt.includes('diameter_user_unknown'));
     });
 
     if (pacoErrPacket) {
