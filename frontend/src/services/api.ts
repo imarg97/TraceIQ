@@ -439,24 +439,25 @@ Once the file is deployed with 644 permissions, the MRFP will stream the greetin
       };
     }
 
-    // RCA Scenario B: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures
+    // RCA Scenario B: Packet Core (PACO / EPC / 5GC) Bearer & Session Failures (ONLY for genuine Packet Core traces)
     const isPaco = fileName.toLowerCase().includes('paco') || 
                    fileName.toLowerCase().includes('epc') || 
                    fileName.toLowerCase().includes('5gc') || 
-                   packets.some(p => p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP' || p.protocol === 'PFCP' || p.raw_text?.includes('gtp') || p.raw_text?.includes('s1ap'));
+                   packets.some(p => p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP' || p.protocol === 'PFCP');
 
-    const pacoErrPkt = packets.find(p => {
+    const pacoErrPkt = isPaco ? packets.find(p => {
       const txt = (p.raw_text || '').toLowerCase();
-      return txt.includes('context not found') || 
+      return (p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP' || p.protocol === 'PFCP') && (
+             txt.includes('context not found') || 
              txt.includes('no resources') || 
-             txt.includes('denied') || 
+             txt.includes('service denied') || 
              txt.includes('esm failure') || 
              txt.includes('dnn not supported') || 
              txt.includes('plmn not allowed') || 
-             txt.includes('diameter_user_unknown');
-    });
+             txt.includes('diameter_user_unknown'));
+    }) : undefined;
 
-    if (pacoErrPkt || (isPaco && packets.some(p => p.raw_text?.toLowerCase().includes('reject') || p.raw_text?.toLowerCase().includes('failure')))) {
+    if (isPaco && (pacoErrPkt || packets.some(p => (p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP') && (p.raw_text?.toLowerCase().includes('reject') || p.raw_text?.toLowerCase().includes('failure'))))) {
       return {
         answer: `### 🎯 Root Cause Analysis (RCA): Packet Core (PACO) Bearer Failure in \`${fileName}\`
 
