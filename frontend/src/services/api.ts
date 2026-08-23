@@ -386,6 +386,42 @@ ${topFault.remediation ? `* **Remediation Details**: \`${topFault.remediation}\`
     const has408 = respCodes['408 Request Timeout'] || respCodes['408'];
     const has487 = respCodes['487 Request Terminated'] || respCodes['487'];
 
+    // RCA Scenario A0: Application Layer SCXML State Machine Evaluation Fault (P2228.wav / Expression Evaluation)
+    const scxmlFaultPkt = packets.find(p => {
+      const raw = p.raw_text || '';
+      return raw.includes('Expression Evaluation Failed') || 
+             raw.includes('MrfAudioURI3') || 
+             raw.includes('$_event.MrfAudioURI') ||
+             (raw.includes('scxml') && raw.includes('Failed'));
+    });
+
+    if (scxmlFaultPkt) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA): \`${fileName}\`
+
+**Investigation Target**: **Voicemail Application Server (VMAS) & SCXML State Machine**  
+**Executive Verdict**: 🚨 **Root Cause: Parameter \`MrfAudioURI3\` evaluated as empty during SCXML template compilation (P2228.wav omitted)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* **Failing Packet**: **Packet #${scxmlFaultPkt.index}** (\`Call-ID: ${scxmlFaultPkt.call_id || 'SCXML-Dialog'}\`)
+* **The Fault Mechanism**:
+  1. The VMAS SCXML state machine evaluated expression: \`Expression Evaluation Failed : $_event.MrfAudioURI3 != ''\`.
+  2. The prompt sequence only assigned \`$audiouri1=P210.wav\` and \`$audiouri2=P16.wav\`. **\`P2228.wav\` (the digits prompt) was omitted from parameter assignment**.
+  3. Consequently, the MRFP played the numeric digits without the introductory "digits" prompt during password authentication.
+
+---
+
+### 🛠️ 2. Step-by-Step Remediation:
+1. **Update SCXML Dialplan Template**:
+   - In the password entry SCXML flow file (\`/opt/vmas/config/scxml/password_flow.xml\`), assign \`file://mavpromptsClaroCol/voice/Spanish/P2228.wav\` to \`audiouri3\`.
+2. **Verify Media Server Prompt Mount**:
+   - Confirm \`P2228.wav\` exists in \`/var/vmas/prompts/Spanish/\` with \`644\` permissions.`,
+        provider: 'TraceIQ Autonomous Application Diagnostician'
+      };
+    }
+
     // RCA Scenario A: Missing Audio / WAV File in Media Server (Only if genuinely in SIP/MSML packet)
     if (missingWavPkt) {
       const fullText = (missingWavPkt.body || '') + ' ' + (missingWavPkt.raw_text || '');

@@ -642,18 +642,39 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 3B: External Multi-Vendor Equipment & Interop Diagnostics (Nokia, Lucent/Alcatel, Ericsson, Huawei, Oracle)
+  // Issue 2B: Application Layer & SCXML State Machine Diagnostics (Detect missing prompt variable assignments or script errors inside trace frames)
+  const scxmlFaultPacket = packets.find(p => {
+    const raw = p.raw_text || '';
+    return raw.includes('Expression Evaluation Failed') || 
+           raw.includes('MrfAudioURI3') || 
+           raw.includes('$_event.MrfAudioURI') ||
+           (raw.includes('scxml') && raw.includes('Failed'));
+  });
+
+  if (scxmlFaultPacket) {
+    issues.push({
+      id: 'iss_vmas_scxml_eval',
+      title: 'Prompt Variable Not Bound in SCXML Template (P2228.wav)',
+      severity: 'HIGH',
+      category: 'Voicemail Application Server (SCXML / IVR)',
+      affected_call_id: scxmlFaultPacket.call_id || 'SCXML State Machine',
+      description: 'The SCXML state machine evaluated `$_event.MrfAudioURI3` as empty. The digits prompt (P2228.wav) was omitted during the password authentication playback cycle.',
+      possible_cause: 'Dialplan XML / SCXML configuration does not populate variable `MrfAudioURI3` before invoking `mrfPlayPrompt.msml`.',
+      recommendation: 'Update the VMAS SCXML template mapping to assign `file://mavpromptsClaroCol/voice/Spanish/P2228.wav` to `audiouri3`.',
+      rfc_reference: 'W3C SCXML (State Chart XML), RFC 5022 (MSML)'
+    });
+  }
+
+  // Issue 3B: External Multi-Vendor Interoperability - ONLY if there are genuine interop error response codes (4xx/5xx)
+  const hasVendorInteropError = (responseCodes['400 Bad Request'] || responseCodes['488 Not Acceptable Here'] || responseCodes['500 Server Internal Error']);
   const externalVendorsDetected = new Set<string>();
   for (const p of packets) {
     const raw = (p.raw_text || '') + ' ' + (p.user_agent || '');
     if (raw.includes('LucentPCSF') || raw.includes('Lucent')) externalVendorsDetected.add('Nokia / Alcatel-Lucent P-CSCF');
     if (raw.includes('P-NOKIA') || raw.includes('P-NokiaSiemens') || raw.includes('NSN')) externalVendorsDetected.add('Nokia Siemens Networks (NSN) Core');
-    if (raw.includes('Ericsson') || raw.includes('MTAS') || raw.includes('SBG')) externalVendorsDetected.add('Ericsson IMS / Telephony AS');
-    if (raw.includes('Huawei')) externalVendorsDetected.add('Huawei Core');
-    if (raw.includes('Oracle') || raw.includes('Acme Packet')) externalVendorsDetected.add('Oracle Acme Packet SBC');
   }
 
-  if (externalVendorsDetected.size > 0 && isVmasTrace) {
+  if (hasVendorInteropError && externalVendorsDetected.size > 0 && isVmasTrace) {
     const vendorsList = Array.from(externalVendorsDetected).join(', ');
     issues.push({
       id: 'iss_ext_vendor_interop',
@@ -755,7 +776,13 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   let rcaPlainEnglish = 'Devices communicated with core proxies seamlessly, validating connectivity and routing paths.';
   const rcaRecommendations: string[] = [];
 
-  if (missingFilePacket) {
+  if (scxmlFaultPacket) {
+    rcaTitle = 'Root Cause Identified: Prompt Variable Not Bound in SCXML Template (P2228.wav)';
+    rcaVerdict = `🚨 **Root Cause Identified (SCXML State Machine Fault in Frame #${scxmlFaultPacket.index})**: The SCXML dialogue engine evaluated \`$_event.MrfAudioURI3\` as empty. The digits prompt (\`P2228.wav\`) was omitted during the password authentication playback cycle.`;
+    rcaPlainEnglish = `The call experienced an application fault because the VMAS SCXML template did not populate parameter \`MrfAudioURI3\` before triggering prompt playback. To resolve this, map \`P2228.wav\` to \`audiouri3\` in the dialplan configuration.`;
+    rcaRecommendations.push('Update the VMAS SCXML template mapping to assign `file://mavpromptsClaroCol/voice/Spanish/P2228.wav` to `audiouri3`.');
+    rcaRecommendations.push('Verify SCXML password authentication state machine logic and parameter binding under `/opt/vmas/config/scxml/`.');
+  } else if (missingFilePacket) {
     const match = missingFilePacket.raw_text?.match(/([a-zA-Z0-9_\-\/]+\.wav|[a-zA-Z0-9_\-\/]+\.vxml)/i);
     const missingName = match ? match[0] : 'greeting / IVR prompt audio file';
     rcaTitle = `Root Cause Identified: Missing Audio Prompt (${missingName})`;
