@@ -755,7 +755,92 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     });
   }
 
-  // Issue 7: Standard Authentication Challenge (401 Unauthorized)
+  // Issue 7: Subscriber Busy Here (SIP 486 Busy Here)
+  if (responseCodes['486 Busy Here'] || responseCodes['486']) {
+    const count = responseCodes['486 Busy Here'] || responseCodes['486'];
+    issues.push({
+      id: 'iss_486',
+      title: `User Busy / Call Gating Rejection (${count}x SIP 486 Busy Here)`,
+      severity: 'LOW',
+      category: 'Call Control & Feature Handling',
+      description: `Observed ${count} occurrences of SIP 486 Busy Here. The called subscriber device was actively engaged in another call, has Do-Not-Disturb (DND) active, or Call Forwarding Busy (CFB) was triggered towards VMAS voicemail.`,
+      possible_cause: 'Subscriber engaged on another call leg, or Supplementary Service Call Waiting (CW) is disabled in HSS profile.',
+      recommendation: 'Verify if Call Waiting (CW / 3GPP TS 24.615) is enabled on subscriber profile or verify Call Forwarding No Reply/Busy rules in TAS.',
+      rfc_reference: 'RFC 3261 Section 21.4.24, 3GPP TS 24.615'
+    });
+  }
+
+  // Issue 8: Not Acceptable Here / Codec Negotiation Mismatch (SIP 488)
+  if (responseCodes['488 Not Acceptable Here'] || responseCodes['488'] || responseCodes['606 Not Acceptable']) {
+    issues.push({
+      id: 'iss_488',
+      title: 'SDP Media / Codec Negotiation Incompatible (SIP 488 / 606)',
+      severity: 'HIGH',
+      category: 'Media & Codec Negotiation (SDP)',
+      description: 'Downstream node or subscriber UE rejected the SDP offer with 488 Not Acceptable Here. None of the proposed audio codecs (EVS / AMR-WB / G.711) or packetization parameters (ptime / maxptime) match the remote gateway capabilities.',
+      possible_cause: 'Codec mismatch between VoLTE HD Voice (AMR-WB 16kHz) and legacy PSTN/IBCF trunk without active media transcoding.',
+      recommendation: '1. Inspect SDP m=audio line and a=rtpmap declarations in initial INVITE.\n2. Enable MRFP / ATGW transcoding profile for AMR-WB (12.65kbps) to G.711 (PCMU/A).\n3. Verify AMR-WB octet-align vs bandwidth-efficient mode alignment on the SBC.',
+      rfc_reference: 'RFC 3261 Section 21.4.26, RFC 4566 (SDP), 3GPP TS 26.114'
+    });
+  }
+
+  // Issue 9: User Not Found / Unallocated Number (SIP 404 Not Found)
+  if (responseCodes['404 Not Found'] || responseCodes['404']) {
+    issues.push({
+      id: 'iss_404',
+      title: 'Target Subscriber Unallocated / Not Found (SIP 404 Not Found)',
+      severity: 'MEDIUM',
+      category: 'Routing & ENUM Lookup',
+      description: 'The S-CSCF, BGCF, or ENUM DNS server returned 404 Not Found for the dialed MSISDN/URI.',
+      possible_cause: 'Dialed digits format mismatch (missing E.164 country code prefix), subscriber not provisioned in HSS/UDM, or invalid LNP (Local Number Portability) routing query.',
+      recommendation: '1. Inspect Request-URI and To header formatting (verify E.164 +country code).\n2. Check ENUM / LNP dip database responses and HSS subscriber database provisioning.',
+      rfc_reference: 'RFC 3261 Section 21.4.5, 3GPP TS 29.328'
+    });
+  }
+
+  // Issue 10: Forbidden / Identity Barring (SIP 403 Forbidden)
+  if (responseCodes['403 Forbidden'] || responseCodes['403']) {
+    issues.push({
+      id: 'iss_403',
+      title: 'Carrier Access Barring / Originator Blocked (SIP 403 Forbidden)',
+      severity: 'HIGH',
+      category: 'Security & Policy Control',
+      description: 'P-CSCF or S-CSCF rejected signaling transaction with 403 Forbidden.',
+      possible_cause: 'Roaming restriction (roaming not allowed on visited PLMN), subscriber account delinquent/suspended, or IPsec SA security association mismatch between UE and P-CSCF.',
+      recommendation: '1. Inspect subscriber roaming agreement profile in HSS/UDM.\n2. Check P-Asserted-Identity / From header against IMS subscription profile.\n3. Verify P-CSCF IPsec SPI and encryption keys.',
+      rfc_reference: 'RFC 3261 Section 21.4.4, 3GPP TS 24.229'
+    });
+  }
+
+  // Issue 11: Temporarily Unavailable / Paging Failure (SIP 480 Temporarily Unavailable)
+  if (responseCodes['480 Temporarily Unavailable'] || responseCodes['480']) {
+    issues.push({
+      id: 'iss_480',
+      title: 'Radio Paging Timeout / Callee Detached (SIP 480 Temporarily Unavailable)',
+      severity: 'MEDIUM',
+      category: 'Radio Access Network (RAN) / Paging',
+      description: 'The network returned 480 Temporarily Unavailable because the target mobile handset failed to respond to LTE/5G S1AP/NGAP radio paging before the paging guard timer expired.',
+      possible_cause: 'Subscriber entered out-of-coverage dead zone, battery died without sending IMS DE-REGISTER, or eNodeB/gNodeB S1-U link degradation.',
+      recommendation: '1. Inspect MME/AMF paging attempt counters and S1AP paging success rate.\n2. Verify RF cell coverage and RRC connection establishment logs.',
+      rfc_reference: 'RFC 3261 Section 21.4.18, 3GPP TS 23.401'
+    });
+  }
+
+  // Issue 12: Server Internal Error (SIP 500 Server Internal Error)
+  if (responseCodes['500 Server Internal Error'] || responseCodes['500']) {
+    issues.push({
+      id: 'iss_500',
+      title: 'Core Node Internal Exception (SIP 500 Server Internal Error)',
+      severity: 'CRITICAL',
+      category: 'Core Node Stability',
+      description: 'Downstream core network element (S-CSCF / TAS / HSS) crashed or threw an unhandled software exception while executing business logic.',
+      possible_cause: 'Corrupt subscriber profile XML schema, null pointer exception in SIP servlet/container, or database timeout on backend Cassandra/MariaDB.',
+      recommendation: 'Inspect container stderr logs on the throwing node, check backend database latency, and verify memory heap dump metrics.',
+      rfc_reference: 'RFC 3261 Section 21.5.1'
+    });
+  }
+
+  // Issue 13: Standard Authentication Challenge (401 Unauthorized)
   if (responseCodes['401 Unauthorized'] || responseCodes['401']) {
     issues.push({
       id: 'iss_401',
@@ -836,15 +921,31 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaRecommendations.push('Monitor periodic OPTIONS keepalive timings under peak traffic.');
   }
 
+  // Determine overall health score and failure state based on detected issues
+  const hasCriticalFailure = issues.some(i => i.severity === 'CRITICAL');
+  const hasHighFailure = issues.some(i => i.severity === 'HIGH');
+  const hasMediumFailure = issues.some(i => i.severity === 'MEDIUM');
+
+  let computedHealthScore = 98;
+  if (hasCriticalFailure) {
+    computedHealthScore = 45;
+  } else if (hasHighFailure) {
+    computedHealthScore = 68;
+  } else if (hasMediumFailure) {
+    computedHealthScore = 84;
+  }
+
+  const isCallFailed = hasCriticalFailure || hasHighFailure || missingFilePacket || responseCodes['503'] || responseCodes['500'] || responseCodes['408'] || responseCodes['488'];
+
   return {
     file_name: fileName,
     file_size_bytes: totalBytes,
     packet_count: packets.length,
     total_calls: 1,
-    successful_calls: missingFilePacket || responseCodes['503'] || responseCodes['408'] ? 0 : 1,
-    failed_calls: missingFilePacket || responseCodes['503'] || responseCodes['408'] ? 1 : 0,
+    successful_calls: isCallFailed ? 0 : 1,
+    failed_calls: isCallFailed ? 1 : 0,
     duration_sec: Number(durationSec.toFixed(3)),
-    health_score: missingFilePacket || responseCodes['503'] ? 62 : (responseCodes['408'] ? 74 : 98),
+    health_score: computedHealthScore,
     capture_start_time: packets[0]?.timestamp_str || '00:00:00.000',
     capture_end_time: packets[packets.length - 1]?.timestamp_str || '00:00:00.000',
     avg_call_duration_sec: Number(durationSec.toFixed(1)),
@@ -867,7 +968,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
       executive_summary: `Analyzed \`${fileName}\` (${packets.length} packets). ${rcaPlainEnglish}`,
       technical_summary: `Protocol dissection completed for ${packets.length} frames across ${durationSec.toFixed(2)}s. Evaluated SIP request/response transactions and application message bodies.`,
       root_cause: rcaVerdict,
-      health_score: missingFilePacket || responseCodes['503'] ? 62 : (responseCodes['408'] ? 74 : 98),
+      health_score: computedHealthScore,
       recommendations: rcaRecommendations,
       timeline_summary: [
         `${packets[0]?.timestamp_str || '00:00:00.000'} - Initial signaling frame recorded.`,
