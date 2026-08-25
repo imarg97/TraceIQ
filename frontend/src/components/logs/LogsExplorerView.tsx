@@ -198,34 +198,133 @@ export const LogsExplorerView: React.FC = () => {
         </div>
 
         {/* Right: Inspection & Cross-Correlated Diagnostics */}
-        <div className="w-full lg:w-[420px] shrink-0 flex flex-col gap-3">
+        <div className="w-full lg:w-[460px] shrink-0 flex flex-col gap-3 overflow-hidden">
           
-          {/* Box 1: Identified Faults & Root Causes */}
-          <div className="bg-white dark:bg-ag-darkCard p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-3 shrink-0">
-            <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center gap-2 border-b border-slate-100 dark:border-ag-darkBorder/40 pb-2.5">
-              <Sparkles className="w-4 h-4 text-ag-primary" />
-              <span>Automated Log Root Causes</span>
+          {/* Box 1: Entry Inspector (Selected Line) - Promoted to Top & Expanded */}
+          <div className="flex-1 bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs flex flex-col min-h-[320px] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 pb-2.5 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-ag-primary animate-pulse" />
+                <span className="text-xs sm:text-sm font-bold font-heading text-slate-900 dark:text-slate-100">
+                  {selectedEntry ? `Line #${selectedEntry.index} Deep Analysis` : 'Log Line Deep Inspector'}
+                </span>
+              </div>
+              {selectedEntry && (
+                <button
+                  onClick={() => copyToClipboard(selectedEntry.raw_line, selectedEntry.id)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-ag-darkSurface hover:bg-slate-200 dark:hover:bg-ag-darkBorder text-xs text-slate-700 dark:text-slate-300 hover:text-ag-primary flex items-center gap-1.5 font-mono transition-colors"
+                >
+                  {copiedId === selectedEntry.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copiedId === selectedEntry.id ? 'Copied' : 'Copy Line'}</span>
+                </button>
+              )}
+            </div>
+
+            {selectedEntry ? (
+              <div className="flex-1 overflow-y-auto space-y-3 pt-3 pr-1 font-sans text-xs">
+                {/* Specific Line Context / Real-Time Intelligent Analysis */}
+                <div className="p-3 bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200/50 dark:border-indigo-800/40 rounded-xl space-y-1.5">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-ag-primary flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Intelligent Line Dissection</span>
+                  </div>
+                  <p className="text-slate-800 dark:text-slate-200 text-xs leading-relaxed font-sans">
+                    {selectedEntry.is_fault && selectedEntry.fault_details ? (
+                      selectedEntry.fault_details.root_cause
+                    ) : selectedEntry.level === 'WARN' ? (
+                      `Warning event in module ${selectedEntry.module}: The subsystem reported a non-critical condition during execution.`
+                    ) : selectedEntry.module === 'VMAS' || selectedEntry.module === 'CAL' || selectedEntry.module === 'BDM' ? (
+                      `Mavenir Voicemail Core event (${selectedEntry.module}): Internal thread heartbeat or message queue transit between application manager and routing libraries.`
+                    ) : (
+                      `Subsystem event logged at ${selectedEntry.timestamp || 'initialization'}. Thread/Process context: ${selectedEntry.pid_tid || 'Main Execution Thread'}.`
+                    )}
+                  </p>
+                  {selectedEntry.fault_details?.solution && (
+                    <div className="mt-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-sans text-[11px]">
+                      <strong>Recommended Fix:</strong> {selectedEntry.fault_details.solution}
+                    </div>
+                  )}
+                </div>
+
+                {/* Metadata Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-ag-darkSurface border border-slate-100 dark:border-ag-darkBorder/40">
+                    <span className="text-slate-400 block text-[10px]">Module / Component:</span>
+                    <span className="text-slate-900 dark:text-slate-100 font-bold">{selectedEntry.module || 'SYSTEM'}</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-ag-darkSurface border border-slate-100 dark:border-ag-darkBorder/40">
+                    <span className="text-slate-400 block text-[10px]">Severity Level:</span>
+                    <span className={`font-bold ${selectedEntry.level === 'ERROR' ? 'text-rose-500' : selectedEntry.level === 'WARN' ? 'text-amber-500' : 'text-emerald-500'}`}>
+                      {selectedEntry.level}
+                    </span>
+                  </div>
+                  {selectedEntry.source_file_line && (
+                    <div className="col-span-2 p-2 rounded-lg bg-slate-50 dark:bg-ag-darkSurface border border-slate-100 dark:border-ag-darkBorder/40">
+                      <span className="text-slate-400 block text-[10px]">C++ Source Code Location:</span>
+                      <span className="text-slate-800 dark:text-slate-200 break-all">{selectedEntry.source_file_line}</span>
+                    </div>
+                  )}
+                  {selectedEntry.call_id && (
+                    <div className="col-span-2 p-2 rounded-lg bg-slate-50 dark:bg-ag-darkSurface border border-slate-100 dark:border-ag-darkBorder/40">
+                      <span className="text-slate-400 block text-[10px]">Associated Call-ID:</span>
+                      <span className="text-ag-primary break-all">{selectedEntry.call_id}</span>
+                    </div>
+                  )}
+                  {selectedEntry.msisdn && (
+                    <div className="col-span-2 p-2 rounded-lg bg-slate-50 dark:bg-ag-darkSurface border border-slate-100 dark:border-ag-darkBorder/40">
+                      <span className="text-slate-400 block text-[10px]">Subscriber Phone (MSISDN):</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">{selectedEntry.msisdn}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Raw Line Code View */}
+                <div>
+                  <span className="text-slate-500 dark:text-slate-400 block text-[10px] font-mono mb-1">Full Raw Line Content:</span>
+                  <pre className="p-3 rounded-xl bg-slate-900 text-slate-100 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap break-all leading-relaxed border border-slate-800 shadow-inner">
+                    {selectedEntry.raw_line}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                <Terminal className="w-8 h-8 mb-2 opacity-40 text-ag-primary" />
+                <p className="text-xs font-sans">Click on any log line on the left to inspect full payload, C++ stack provenance, and root cause diagnosis.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Box 2: Automated Log Root Causes (Collapsible / Compact) */}
+          <div className="bg-white dark:bg-ag-darkCard p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-2.5 max-h-[260px] overflow-y-auto shrink-0">
+            <h2 className="font-heading text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100 flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 pb-2">
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-ag-primary" />
+                <span>Automated Log Root Causes</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-ag-primary text-[10px] font-mono font-bold">
+                {currentLog.identified_faults.length} Identified
+              </span>
             </h2>
 
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {currentLog.identified_faults.length === 0 ? (
-                <div className="p-3 bg-emerald-500/5 rounded-xl border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>No critical application exceptions detected in this log.</span>
+                <div className="p-2.5 bg-emerald-500/5 rounded-xl border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>No critical application exceptions detected in this log file.</span>
                 </div>
               ) : (
                 currentLog.identified_faults.map((flt) => (
-                  <div key={flt.id} className="p-3 rounded-xl bg-slate-50 dark:bg-ag-darkSurface border border-slate-200 dark:border-ag-darkBorder space-y-1.5 text-xs">
+                  <div key={flt.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-ag-darkSurface border border-slate-200 dark:border-ag-darkBorder space-y-1 text-xs">
                     <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                      <span>{flt.title}</span>
+                      <span className="text-[11px] sm:text-xs">{flt.title}</span>
                     </div>
-                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed font-sans">
+                    <p className="text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed font-sans">
                       {formatInlineMarkdown(flt.description)}
                     </p>
                     {flt.recommendation && (
-                      <div className="p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-300 font-sans">
-                        <strong>Fix</strong>: {flt.recommendation}
+                      <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-[10px] text-emerald-700 dark:text-emerald-300 font-sans">
+                        <strong>Fix:</strong> {flt.recommendation}
                       </div>
                     )}
                   </div>
@@ -233,61 +332,6 @@ export const LogsExplorerView: React.FC = () => {
               )}
             </div>
           </div>
-
-          {/* Box 2: Entry Inspector (Selected Line) */}
-          {selectedEntry && (
-            <div className="flex-1 bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-3 overflow-y-auto">
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 pb-2">
-                <span className="text-xs font-bold font-heading text-slate-900 dark:text-slate-100">
-                  Line #{selectedEntry.index} Details
-                </span>
-                <button
-                  onClick={() => copyToClipboard(selectedEntry.raw_line, selectedEntry.id)}
-                  className="text-xs text-slate-500 hover:text-ag-primary flex items-center gap-1 font-mono"
-                >
-                  {copiedId === selectedEntry.id ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedId === selectedEntry.id ? 'Copied' : 'Copy Line'}</span>
-                </button>
-              </div>
-
-              {selectedEntry.fault_details && (
-                <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-1.5 text-xs text-slate-800 dark:text-slate-200">
-                  <div className="font-bold text-rose-600 dark:text-rose-400">
-                    {selectedEntry.fault_details.title}
-                  </div>
-                  <p>{selectedEntry.fault_details.root_cause}</p>
-                  <div className="text-emerald-600 dark:text-emerald-400 font-bold">
-                    Suggested Solution: {selectedEntry.fault_details.solution}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2 text-xs font-mono">
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Source Location:</span>
-                  <span className="text-slate-700 dark:text-slate-300">{selectedEntry.source_file_line || 'N/A'}</span>
-                </div>
-                {selectedEntry.call_id && (
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Associated Call-ID:</span>
-                    <span className="text-ag-primary break-all">{selectedEntry.call_id}</span>
-                  </div>
-                )}
-                {selectedEntry.msisdn && (
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Target Subscriber (MSISDN):</span>
-                    <span className="text-emerald-600 dark:text-emerald-400">{selectedEntry.msisdn}</span>
-                  </div>
-                )}
-                <div>
-                  <span className="text-slate-400 block text-[10px]">Full Raw Content:</span>
-                  <pre className="p-2.5 rounded-lg bg-slate-100 dark:bg-black text-[11px] text-slate-800 dark:text-slate-200 overflow-x-auto whitespace-pre-wrap break-all">
-                    {selectedEntry.raw_line}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
 
