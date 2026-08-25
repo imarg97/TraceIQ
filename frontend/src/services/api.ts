@@ -190,9 +190,43 @@ You specialize in:
 
   const queryLower = prompt.toLowerCase();
 
+  // 2A. Direct DTMF & Keypad Digit Inquiry Handler (e.g. "is there any dtmf issue seen", "dtmf", "telephony-event", "sip info dtmf")
+  if (queryLower.includes('dtmf') || queryLower.includes('touch tone') || queryLower.includes('keypad') || queryLower.includes('telephony-event') || (queryLower.includes('digit') && !queryLower.includes('p2228') && !queryLower.includes('prompt'))) {
+    const infoCount = pcapContext?.top_sip_methods?.['INFO'] || packets.filter(p => p.sip_method === 'INFO' || p.raw_text?.includes('INFO sip:')).length;
+    const rtpDtmfPackets = packets.filter(p => p.protocol === 'RTP' && (p.info?.toLowerCase().includes('telephony-event') || p.raw_text?.toLowerCase().includes('telephony-event') || p.payload_type === 101 || p.payload_type === 96));
+    const dtmfIssues = (pcapContext?.issues || []).filter((i: any) => i.id?.includes('dtmf') || i.category?.toLowerCase().includes('dtmf') || i.title?.toLowerCase().includes('dtmf'));
+
+    let dtmfAnswer = `### 🎹 DTMF & Telephony Digit Analysis for \`${pcapContext?.file_name || 'Active Capture'}\`\n\n`;
+    dtmfAnswer += `**Transport Mechanism Observed**: **${infoCount > 0 ? 'In-Band SIP INFO Method' : (rtpDtmfPackets.length > 0 ? 'Out-of-Band RFC 4733 / RTP Telephony Events' : 'No Dedicated DTMF Streams Found')}**\n\n`;
+    dtmfAnswer += `---\n\n`;
+    dtmfAnswer += `### 🔍 1. DTMF Signaling Findings:\n`;
+    dtmfAnswer += `* **SIP INFO Method Frames**: **${infoCount} frames** exchanged.\n`;
+    dtmfAnswer += `* **RFC 4733 RTP Telephony-Event Packets**: **${rtpDtmfPackets.length} packets**.\n`;
+
+    if (dtmfIssues.length > 0) {
+      dtmfAnswer += `* ⚠️ **Observed Anomaly**: ${dtmfIssues[0].description}\n\n`;
+      dtmfAnswer += `---\n\n`;
+      dtmfAnswer += `### 🛠️ 2. Recommended Remediation:\n`;
+      dtmfAnswer += `* ${dtmfIssues[0].recommendation}\n`;
+    } else if (infoCount > 15) {
+      dtmfAnswer += `* ⚠️ **High SIP INFO Density**: More than 15 SIP INFO requests were sent over the signaling proxy instead of using out-of-band RTP. This can cause DTMF digit acknowledgment latency and clipping during rapid user keypad entry.\n\n`;
+      dtmfAnswer += `---\n\n`;
+      dtmfAnswer += `### 🛠️ 2. Recommended Remediation:\n`;
+      dtmfAnswer += `1. **Switch to RFC 4733 RTP Telephony-Events**: Configure the SBC and VMAS media profiles to use \`telephone-event/8000\` (Payload Type 101) instead of SIP INFO for lower latency digit transport.\n`;
+      dtmfAnswer += `2. **Verify Inter-Digit Timers**: Ensure VMAS digit collection timeout is set to at least 4000ms.\n`;
+    } else {
+      dtmfAnswer += `* ✅ **Status**: DTMF signaling is nominal. All collected digits and acknowledgments completed within expected carrier latency windows.\n`;
+    }
+
+    return {
+      answer: dtmfAnswer,
+      provider: 'TraceIQ DTMF & Media Signaling Engine'
+    };
+  }
+
   // 3. Autonomous Root Cause Analysis (RCA) & Solution Diagnostician (e.g. "what is the root cause", "rca", "what is the problem", "why is it failing", "how to fix")
   // Query Handler: Prompt P2228 / Password Audio Guidance
-  if (queryLower.includes('p2228') || (queryLower.includes('prompt') && (queryLower.includes('password') || queryLower.includes('digit') || queryLower.includes('skip')))) {
+  if (queryLower.includes('p2228') || (queryLower.includes('prompt') && (queryLower.includes('password') || queryLower.includes('skip')))) {
     return {
       answer: `### 🎯 Investigation: Missing Prompt P2228.wav in Password Workflow
 

@@ -645,10 +645,9 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   // Issue 2B: Application Layer & SCXML State Machine Diagnostics (Detect missing prompt variable assignments or script errors inside trace frames)
   const scxmlFaultPacket = packets.find(p => {
     const raw = p.raw_text || '';
-    return raw.includes('Expression Evaluation Failed') || 
-           raw.includes('MrfAudioURI3') || 
-           raw.includes('$_event.MrfAudioURI') ||
-           (raw.includes('scxml') && raw.includes('Failed'));
+    return raw.includes('Expression Evaluation Failed : $_event.MrfAudioURI3') || 
+           raw.includes('Expression Evaluation Failed : $_event.MrfAudioURI') ||
+           (raw.includes('Expression Evaluation Failed') && raw.includes('MrfAudioURI'));
   });
 
   if (scxmlFaultPacket) {
