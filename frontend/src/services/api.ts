@@ -290,9 +290,10 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
   }
 
   // Dedicated Handler: Database, MCN & MCA Insert Failure Inquiry
-  if (queryLower.includes('mcn') || queryLower.includes('mca') || queryLower.includes('dbinsert') || queryLower.includes('dbadapter') || queryLower.includes('database') || queryLower.includes('insert_mca_record')) {
-    return {
-      answer: `### 🎯 Root Cause Analysis: Database Insert Failure for MCA/MCN (\`DBInsert.Failed\`)
+  if (queryLower.includes('mcn') || queryLower.includes('mca') || queryLower.includes('dbinsert') || queryLower.includes('dbadapter') || (queryLower.includes('database') && !queryLower.includes('redis'))) {
+    if (logContext?.identified_faults && logContext.identified_faults.some((f: any) => f.title?.toLowerCase().includes('database') || f.title?.toLowerCase().includes('mcn') || f.title?.toLowerCase().includes('mca'))) {
+      return {
+        answer: `### 🎯 Root Cause Analysis: Database Insert Failure for MCA/MCN (\`DBInsert.Failed\`)
 
 **Investigation Target**: **VMAS DBAdapter & Missed Call Alert (MCA/MCN) State Machine**  
 **Executive Verdict**: 🚨 **Root Cause: Procedure \`INSERT_MCA_RECORD\` returned \`DBADAPTER_DBQUERY_RSP_ERR\` / \`[DB Proc failed]\`**
@@ -300,7 +301,7 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
 ---
 
 ### 🔍 1. Technical Diagnosis:
-* In the VMAS application log (\`vmas0mcn0209_sc.alogc\`), the SCXML dialogue engine attempted to persist a Missed Call Notification record via \`InsertMCARecord.scxml\`.
+* In the VMAS application log (\`${logContext.file_name}\`), the SCXML dialogue engine attempted to persist a Missed Call Notification record via \`InsertMCARecord.scxml\`.
 * The log recorded:
   \`\`\`text
   <08:31:37.245 DBG SCXMLAPP>[createSCXMLMsg] EventName: DBInsert.Failed
@@ -318,8 +319,32 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
    - Inspect the Oracle/PostgreSQL/MySQL database server hosting VMAS records for table locks, deadlocks, or exhausted tablespaces.
 3. **Validate DBAdapter Connection Pool**:
    - Inspect \`/opt/vmas/config/dbadapter/dbadapter.cfg\` and verify connection pool health and database socket timeouts.`,
-      provider: 'TraceIQ Database & MCN Diagnostician'
-    };
+        provider: 'TraceIQ Database & MCN Diagnostician'
+      };
+    } else {
+      // PCAP / Signaling perspective for MCN
+      const mcnPackets = packets.filter(p => (p.raw_text || '').toLowerCase().includes('mcn') || (p.info || '').toLowerCase().includes('mcn') || (p.to_header || '').toLowerCase().includes('mcn'));
+      return {
+        answer: `### 🎯 MCN (Missed Call Notification) Signaling Analysis for \`${pcapContext?.file_name || 'Active Session'}\`
+
+**Investigation Target**: **Missed Call Alert (MCA/MCN) Signaling & Call Leg Delivery**  
+**Executive Verdict**: ${mcnPackets.length > 0 ? `Observed ${mcnPackets.length} MCN-related signaling frame(s).` : 'No explicit MCN SIP failure headers found in the captured packets.'}
+
+---
+
+### 🔍 1. Network Signaling Assessment:
+* **Captured Frames**: Analyzed **${packets.length} packets** in the network trace.
+* **SIP Status**: ${pcapContext?.issues && pcapContext.issues.length > 0 ? `Observed signaling anomaly: **${pcapContext.issues[0].title}**` : 'All SIP dialog transactions in this PCAP completed nominally.'}
+* **Application Log Correlation**: MCN database write procedures (\`INSERT_MCA_RECORD\`) and backend DBAdapter retry loops occur internally on the application server. To inspect stored procedure execution or DB query responses, please correlate with the corresponding VMAS \`.alogc\` application logs.
+
+---
+
+### 🛠️ 2. Recommended Checks:
+1. Verify that SIP INVITE forwarding to the MCN AS contains correct diversion headers (\`Diversion: <tel:...>;reason=no-answer\`).
+2. If SMS notification is expected, check SMPP / MAP signaling links between the MCN server and the SMSC.`,
+        provider: 'TraceIQ MCN Signaling Engine'
+      };
+    }
   }
 
   // 2B. Direct Provenance & Specific Query Handlers (e.g. "where did you find...", "what line...", "what packet...")
@@ -508,42 +533,6 @@ ${topFault.remediation ? `* **Remediation Details**: \`${topFault.remediation}\`
     const has503 = respCodes['503 Service Unavailable'] || respCodes['503'];
     const has408 = respCodes['408 Request Timeout'] || respCodes['408'];
     const has487 = respCodes['487 Request Terminated'] || respCodes['487'];
-
-    // RCA Scenario A0: Application Layer SCXML State Machine Evaluation Fault (P2228.wav / Expression Evaluation)
-    const scxmlFaultPkt = packets.find(p => {
-      const raw = p.raw_text || '';
-      return raw.includes('Expression Evaluation Failed') || 
-             raw.includes('MrfAudioURI3') || 
-             raw.includes('$_event.MrfAudioURI') ||
-             (raw.includes('scxml') && raw.includes('Failed'));
-    });
-
-    if (scxmlFaultPkt) {
-      return {
-        answer: `### 🎯 Root Cause Analysis (RCA): \`${fileName}\`
-
-**Investigation Target**: **Voicemail Application Server (VMAS) & SCXML State Machine**  
-**Executive Verdict**: 🚨 **Root Cause: Parameter \`MrfAudioURI3\` evaluated as empty during SCXML template compilation (P2228.wav omitted)**
-
----
-
-### 🔍 1. Technical Diagnosis:
-* **Failing Packet**: **Packet #${scxmlFaultPkt.index}** (\`Call-ID: ${scxmlFaultPkt.call_id || 'SCXML-Dialog'}\`)
-* **The Fault Mechanism**:
-  1. The VMAS SCXML state machine evaluated expression: \`Expression Evaluation Failed : $_event.MrfAudioURI3 != ''\`.
-  2. The prompt sequence only assigned \`$audiouri1=P210.wav\` and \`$audiouri2=P16.wav\`. **\`P2228.wav\` (the digits prompt) was omitted from parameter assignment**.
-  3. Consequently, the MRFP played the numeric digits without the introductory "digits" prompt during password authentication.
-
----
-
-### 🛠️ 2. Step-by-Step Remediation:
-1. **Update SCXML Dialplan Template**:
-   - In the password entry SCXML flow file (\`/opt/vmas/config/scxml/password_flow.xml\`), assign \`file://mavpromptsClaroCol/voice/Spanish/P2228.wav\` to \`audiouri3\`.
-2. **Verify Media Server Prompt Mount**:
-   - Confirm \`P2228.wav\` exists in \`/var/vmas/prompts/Spanish/\` with \`644\` permissions.`,
-        provider: 'TraceIQ Autonomous Application Diagnostician'
-      };
-    }
 
     // RCA Scenario A: Missing Audio / WAV File in Media Server (Only if genuinely in SIP/MSML packet)
     if (missingWavPkt) {

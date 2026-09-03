@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useTraceStore } from '../../store/useTraceStore';
 import { askTelecomAI } from '../../services/api';
 import { formatInlineMarkdown } from '../../utils/formatMarkdown';
@@ -96,14 +96,42 @@ export const AICopilotView: React.FC = () => {
     }
   }, []);
 
-  // Dynamic suggested inquiries
-  const dynamicPrompts = [
-    "What is the root cause of this failure?",
-    "Why was prompt P2228 skipped in the password section?",
-    "How does the silence detection timer work?",
-    "Explain SIP 481 Call Leg Does Not Exist error",
-    "What is RTP and how does it deliver audio?"
-  ];
+  // Dynamic suggested inquiries based strictly on genuine session context
+  const dynamicPrompts = useMemo(() => {
+    const prompts: string[] = ["What is the root cause of this failure?"];
+
+    if (currentLog?.identified_faults && currentLog.identified_faults.length > 0) {
+      for (const fault of currentLog.identified_faults.slice(0, 2)) {
+        if (fault.title.toLowerCase().includes('database') || fault.title.toLowerCase().includes('mcn')) {
+          prompts.push("Explain the MCN database insert failure and retry loop");
+        } else if (fault.title.toLowerCase().includes('prompt') || fault.title.toLowerCase().includes('scxml')) {
+          prompts.push(`Why did ${fault.title} fail in the SCXML state machine?`);
+        } else {
+          prompts.push(`How do I resolve: ${fault.title}?`);
+        }
+      }
+    } else if (currentPcap?.issues && currentPcap.issues.length > 0) {
+      for (const issue of currentPcap.issues.slice(0, 2)) {
+        if (issue.title.toLowerCase().includes('dtmf')) {
+          prompts.push("Are there any DTMF digit collection or transport issues?");
+        } else if (issue.title.toLowerCase().includes('rx') || issue.title.toLowerCase().includes('aaa')) {
+          prompts.push("What caused the Diameter Rx policy AAA timeout?");
+        } else if (issue.title.toLowerCase().includes('missing')) {
+          prompts.push(`How do I remediate ${issue.title}?`);
+        } else {
+          prompts.push(`Explain the signaling fault: ${issue.title}`);
+        }
+      }
+    }
+
+    if (!prompts.some(p => p.toLowerCase().includes('dtmf'))) {
+      prompts.push("Are there any DTMF issues seen in this session?");
+    }
+    prompts.push("How does the silence detection timer work?");
+    prompts.push("Explain SIP 481 Call Leg Does Not Exist error");
+
+    return Array.from(new Set(prompts)).slice(0, 5);
+  }, [currentPcap, currentLog]);
 
   const createInitialMessage = (): ChatMessage => {
     const title = currentPcap?.file_name || currentLog?.file_name || 'Active Session';
