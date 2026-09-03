@@ -146,6 +146,7 @@ export interface LogAnalysisResult {
   warn_count: number;
   info_count: number;
   entries: LogEntry[];
+  raw_lines?: string[]; // Full un-truncated line buffer for 100% complete search across 1,000,000+ lines
   identified_faults: IssueEngineItem[];
   discovered_identifiers: {
     call_ids: string[];

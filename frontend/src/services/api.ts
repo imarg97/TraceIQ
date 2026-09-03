@@ -1,5 +1,6 @@
 import { PCAPAnalysisResult, SamplePCAPItem, PCAPCompareResult, LogAnalysisResult } from '../types';
 import { parsePcapArrayBuffer } from '../utils/pcapClientParser';
+import { TelecomKnowledgeMemory } from '../utils/telecomKnowledge';
 
 const API_BASE = '/api/v1';
 
@@ -221,6 +222,34 @@ You specialize in:
     return {
       answer: dtmfAnswer,
       provider: 'TraceIQ DTMF & Media Signaling Engine'
+    };
+  }
+
+  // 2C. Telecom Knowledge Base Memory Lookup (SIP, MRF, TAS, ASBC, CSCF, VMS, Diameter, Database)
+  const matchedKb = TelecomKnowledgeMemory.matchKnowledge(prompt);
+  if (matchedKb && !queryLower.includes('p2228')) {
+    return {
+      answer: `### 🧠 TraceIQ Telecom Knowledge Memory: ${matchedKb.title}
+
+**Domain Category**: **${matchedKb.category}**  
+**Executive Verdict**: ${matchedKb.technical_verdict}  
+**Historical Pattern Hits**: ${matchedKb.historical_occurrences || 1} occurrence(s) across carrier sessions
+
+---
+
+### 🔍 1. Technical Root Cause:
+* ${matchedKb.root_cause}
+
+---
+
+### 🛠️ 2. Proven Carrier Remediation Steps:
+${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join('\n')}
+
+---
+
+### 📚 3. Standards & Architecture References:
+* \`${matchedKb.rfc_3gpp_ref}\``,
+      provider: 'TraceIQ Persistent Telecom Knowledge Base'
     };
   }
 

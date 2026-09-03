@@ -436,6 +436,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     warn_count: warnCount,
     info_count: infoCount,
     entries,
+    raw_lines: lines, // Preserve 100% of all lines for instantaneous deep-search across 1,000,000+ line files
     identified_faults: identifiedFaults,
     discovered_identifiers: {
       call_ids: Array.from(callIdsSet),

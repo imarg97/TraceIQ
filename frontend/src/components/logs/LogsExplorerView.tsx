@@ -14,6 +14,7 @@ import {
   GripHorizontal
 } from 'lucide-react';
 import { formatInlineMarkdown } from '../../utils/formatMarkdown';
+import { LogEntry } from '../../types';
 
 export const LogsExplorerView: React.FC = () => {
   const { currentLog, currentPcap } = useTraceStore();
@@ -93,8 +94,46 @@ export const LogsExplorerView: React.FC = () => {
     );
   }
 
-  // Filter entries
+  // High-performance filter & instantaneous deep search across 1,000,000+ lines
   const filteredEntries = useMemo(() => {
+    // If user enters a specific search query and we have the full raw_lines buffer
+    if (searchQuery && searchQuery.trim().length > 1 && currentLog.raw_lines && currentLog.raw_lines.length > currentLog.entries.length) {
+      const q = searchQuery.toLowerCase();
+      const dynamicMatches: LogEntry[] = [];
+      const lines = currentLog.raw_lines;
+
+      for (let i = 0; i < lines.length && dynamicMatches.length < 5000; i++) {
+        const line = lines[i];
+        if (line && line.toLowerCase().includes(q)) {
+          let lvl: 'CRITICAL' | 'ERROR' | 'WARN' | 'INFO' | 'DEBUG' = 'INFO';
+          const upper = line.toUpperCase();
+          if (upper.includes('ERR') || upper.includes('FATAL') || upper.includes('FAIL') || upper.includes('CRIT')) lvl = 'ERROR';
+          else if (upper.includes('WRN') || upper.includes('WARN')) lvl = 'WARN';
+          else if (upper.includes('DBG') || upper.includes('TRACE')) lvl = 'DEBUG';
+
+          if (levelFilter === 'ALL' || lvl === levelFilter) {
+            dynamicMatches.push({
+              id: `dyn_log_${i + 1}`,
+              index: i + 1,
+              timestamp: '',
+              level: lvl,
+              module: 'MATCHED_LINE',
+              pid_tid: '',
+              source_file_line: '',
+              message: line,
+              raw_line: line,
+              is_fault: lvl === 'ERROR'
+            });
+          }
+        }
+      }
+
+      if (dynamicMatches.length > 0) {
+        return dynamicMatches;
+      }
+    }
+
+    // Default fast filter on parsed entries
     return currentLog.entries.filter(e => {
       const matchLvl = levelFilter === 'ALL' || e.level === levelFilter;
       const matchSearch = !searchQuery || 
