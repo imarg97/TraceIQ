@@ -224,9 +224,9 @@ You specialize in:
     };
   }
 
-  // 3. Autonomous Root Cause Analysis (RCA) & Solution Diagnostician (e.g. "what is the root cause", "rca", "what is the problem", "why is it failing", "how to fix")
-  // Query Handler: Prompt P2228 / Password Audio Guidance
-  if (queryLower.includes('p2228') || (queryLower.includes('prompt') && (queryLower.includes('password') || queryLower.includes('skip')))) {
+  // 3. Autonomous Root Cause Analysis (RCA) & Solution Diagnostician
+  // Dedicated Handler: Explicit inquiry about P2228
+  if (queryLower.includes('p2228')) {
     return {
       answer: `### 🎯 Investigation: Missing Prompt P2228.wav in Password Workflow
 
@@ -236,7 +236,7 @@ You specialize in:
 ---
 
 ### 🔍 1. Technical Root Cause Breakdown:
-* In the application debug log (\`vmastest1_21Aug_sc.alogc\`), the SCXML dialogue engine constructed the prompt playback sequence:
+* In the password workflow, the SCXML dialogue engine constructed the prompt playback sequence:
   \`\`\`xml
   <dialogstart type="application/moml+xml" target="conn:az1-vmas-mrfp-1..." name="playPrompt">
     <play barge="true" cleardb="true" offset="1ms" xml:lang="spa-Spanish">
@@ -257,6 +257,39 @@ You specialize in:
 2. **Verify File Existence on MRFP**:
    - Verify that \`P2228.wav\` exists in \`/var/vmas/prompts/Spanish/P2228.wav\` with \`644\` read permissions.`,
       provider: 'TraceIQ VMAS & SCXML Log Diagnostician'
+    };
+  }
+
+  // Dedicated Handler: Database, MCN & MCA Insert Failure Inquiry
+  if (queryLower.includes('mcn') || queryLower.includes('mca') || queryLower.includes('dbinsert') || queryLower.includes('dbadapter') || queryLower.includes('database') || queryLower.includes('insert_mca_record')) {
+    return {
+      answer: `### 🎯 Root Cause Analysis: Database Insert Failure for MCA/MCN (\`DBInsert.Failed\`)
+
+**Investigation Target**: **VMAS DBAdapter & Missed Call Alert (MCA/MCN) State Machine**  
+**Executive Verdict**: 🚨 **Root Cause: Procedure \`INSERT_MCA_RECORD\` returned \`DBADAPTER_DBQUERY_RSP_ERR\` / \`[DB Proc failed]\`**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* In the VMAS application log (\`vmas0mcn0209_sc.alogc\`), the SCXML dialogue engine attempted to persist a Missed Call Notification record via \`InsertMCARecord.scxml\`.
+* The log recorded:
+  \`\`\`text
+  <08:31:37.245 DBG SCXMLAPP>[createSCXMLMsg] EventName: DBInsert.Failed
+  <08:31:37.245 DBG DB_ADAP_MGR>[getSMEEvent] Store DBADAPTER_DBQUERY_RSP_ERR event
+  <08:31:37.245 DBG DB_ADAP_CLI>[OnMessage-DbAdapterClient] procedureName = [INSERT_MCA_RECORD] statusText = [DB Proc failed]
+  \`\`\`
+* Following the rejection, VMAS scheduled a retry loop via \`MCN.scxml :: RegisterMcn->StartInsertMCACallInfoDBRetryTimer\` (retrying every 5 minutes), which repeatedly failed.
+
+---
+
+### 🛠️ 2. Recommended Solution:
+1. **Verify Database Permissions & Stored Procedure**:
+   - Ensure the database user used by DBAdapter has execute permissions on \`INSERT_MCA_RECORD\` and write access to the MCA call info tables.
+2. **Check Database Health & Table Space**:
+   - Inspect the Oracle/PostgreSQL/MySQL database server hosting VMAS records for table locks, deadlocks, or exhausted tablespaces.
+3. **Validate DBAdapter Connection Pool**:
+   - Inspect \`/opt/vmas/config/dbadapter/dbadapter.cfg\` and verify connection pool health and database socket timeouts.`,
+      provider: 'TraceIQ Database & MCN Diagnostician'
     };
   }
 

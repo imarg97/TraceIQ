@@ -122,16 +122,13 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
       const data = await uploadPcapFile(file);
       const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
       
-      // If a log is already active, link it to the PCAP
-      const activeLog = get().currentLog;
-      if (activeLog) {
-        data.linked_logs = activeLog;
-      }
-
+      // When uploading a new standalone PCAP, reset old log state to ensure no stale cross-talk unless explicitly correlated
       set({ 
         currentPcap: data, 
+        currentLog: null,
         recentPcaps: [data, ...prevRecent].slice(0, 8),
         selectedPacket: data.packets ? data.packets[0] : null, 
+        activeTab: 'dashboard',
         isLoading: false 
       });
     } catch (err: any) {
@@ -144,12 +141,6 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
     try {
       const logData = await uploadLogFile(file);
       const prevLogs = get().recentLogs.filter(l => l.file_name !== logData.file_name);
-      
-      // If PCAP is already present, link them
-      const curPcap = get().currentPcap;
-      if (curPcap) {
-        curPcap.linked_logs = logData;
-      }
 
       set({
         currentLog: logData,

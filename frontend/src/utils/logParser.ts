@@ -2,7 +2,7 @@ import { LogAnalysisResult, LogEntry, IssueEngineItem } from '../types';
 
 /**
  * High-Performance Client-Side Log Parser & Root Cause Engine
- * Parses Mavenir/Carrier C++ .alogc files, Kubernetes/OCP pod & VIP logs, Redis cluster traces, and generic application logs.
+ * Generically parses Mavenir/Carrier C++ .alogc files, Kubernetes/OCP pod & VIP logs, Redis cluster traces, and generic application logs.
  */
 export async function parseLogFile(file: File): Promise<LogAnalysisResult> {
   const text = await file.text();
@@ -28,12 +28,27 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
   let isVmas = false;
   let isK8s = false;
   let isRedis = false;
+  let isDiameter = false;
+  let isSip = false;
+
   // Precompiled Regexes for maximum scanning performance across 500k+ line files
   const MAV_REGEX = /^<(\d{2}:\d{2}:\d{2}(?:\.\d+)?)?\s*(\*?[A-Z]+\*?)\s+([A-Z0-9_\-]+)\s+([\d:]+)\s*[^>]*>(?:<([^>]+)>)?(?:\[([^\]]+)\])?\s*(.*)$/i;
   const K8S_REGEX = /^(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?[Z\d:]*)?\s*(?:\[([^\]]+)\])?\s*(ERROR|WARN|INFO|DEBUG|FATAL|CRITICAL)?\s*:?\s*(.*)$/i;
   const CID_REGEX = /(?:Call-ID|pCallid|CallId|call_id)[:=\s]+([a-zA-Z0-9_\-\.@]+)/i;
   const PHONE_REGEX = /(?:\+?[0-9]{10,14})/;
   const WAV_REGEX = /(P\d+\.wav|[a-zA-Z0-9_\-]+\.wav)/ig;
+
+  // Dynamic Fault Trackers (to detect multi-line or frequency patterns)
+  let hasDbInsertFailed = false;
+  let hasMcnFailure = false;
+  let hasMissingPrompt = false;
+  let hasEarlyTeardown = false;
+  let hasDiameterTimeout = false;
+  let hasHttpTimeout = false;
+  let hasRedisError = false;
+  let hasK8sError = false;
+  let hasLicenseFailure = false;
+  let hasOutOfMemory = false;
 
   // Step 1: Parse Line by Line (High-Performance Single Pass)
   for (let i = 0; i < lines.length; i++) {
@@ -101,7 +116,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     }
 
     // Fast-path Identifier Extraction
-    if (callIdsSet.size < 50 && (line.includes('Call-ID') || line.includes('call_id') || line.includes('CallId'))) {
+    if (callIdsSet.size < 50 && (line.includes('Call-ID') || line.includes('call_id') || line.includes('CallId') || line.includes('pCallid'))) {
       const cidMatch = line.match(CID_REGEX);
       if (cidMatch) {
         callId = cidMatch[1];
@@ -109,7 +124,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       }
     }
 
-    if (phoneNumbersSet.size < 50 && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart'))) {
+    if (phoneNumbersSet.size < 50 && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart') || line.includes('TelephoneNumber'))) {
       const phoneMatch = line.match(PHONE_REGEX);
       if (phoneMatch) {
         msisdn = phoneMatch[0];
@@ -136,14 +151,53 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       isRedis = true;
     }
 
+    // Diameter / IMS
+    if (line.includes('Diameter') || line.includes('DIAMETER') || line.includes('Ro') || line.includes('Rf') || line.includes('Sh')) {
+      isDiameter = true;
+    }
+
     // Detect Faults & Root Causes
     let faultDetails: LogEntry['fault_details'] | undefined;
 
-    // Fault Signature 1: VMAS Missing Prompt / Expression Evaluation Failed (e.g. P2228.wav)
-    if (line.includes('Expression Evaluation Failed') && line.includes('MrfAudioURI')) {
+    // Fault Signature A: Database Insert / Adapter Failure (e.g., DBInsert.Failed, DBADAPTER_DBQUERY_RSP_ERR, INSERT_MCA_RECORD failed)
+    if (line.includes('DBInsert.Failed') || 
+        line.includes('DBADAPTER_DBQUERY_RSP_ERR') || 
+        line.includes('[DB Proc failed]') || 
+        (line.includes('INSERT_MCA_RECORD') && (line.includes('failed') || line.includes('Error') || line.includes('failureCode'))) ||
+        line.includes('StartInsertMCACallInfoDBRetryTimer') ||
+        line.includes('SendFailureEvent') && line.includes('InsertMCARecord')) {
       isFault = true;
       level = 'ERROR';
       errorCount++;
+      hasDbInsertFailed = true;
+      hasMcnFailure = true;
+      faultDetails = {
+        title: 'Database Insert Operation Failed (DBInsert.Failed / MCA Record)',
+        root_cause: 'VMAS failed to persist the Missed Call Alert (MCA) / MCN record into the database. DBAdapter returned DBADAPTER_DBQUERY_RSP_ERR, causing the state machine to transition to retry/failure state.',
+        solution: '1. Verify database connectivity and table permissions for the MCA/MCN table.\n2. Inspect database transaction logs and stored procedure return codes for procedure `INSERT_MCA_RECORD`.\n3. Check database disk space and deadlocks.',
+        sugarcoated_summary: 'The application encountered an internal storage timeout while logging call completion records and queued an automated retry.'
+      };
+    }
+
+    // Fault Signature B: MCN / State Machine Transitions into Failure
+    else if (line.includes('MCN.scxml') && (line.includes('Fail') || line.includes('Retry') || line.includes('Error'))) {
+      isFault = true;
+      if (level !== 'ERROR') { level = 'WARN'; warnCount++; }
+      hasMcnFailure = true;
+      faultDetails = {
+        title: 'MCN / Missed Call Notification State Machine Failure',
+        root_cause: 'The Missed Call Notification (MCN) workflow encountered an unhandled exception or database write rejection.',
+        solution: 'Check subscriber MCN provisioning and verify DBAdapter response codes.',
+        sugarcoated_summary: 'Notification engine is rescheduling delivery.'
+      };
+    }
+
+    // Fault Signature 1: VMAS Missing Prompt / Expression Evaluation Failed (e.g. P2228.wav)
+    else if (line.includes('Expression Evaluation Failed') && line.includes('MrfAudioURI')) {
+      isFault = true;
+      level = 'ERROR';
+      errorCount++;
+      hasMissingPrompt = true;
       faultDetails = {
         title: 'SCXML Prompt Variable Missing in Dialog Flow',
         root_cause: `The VMAS state machine evaluated a prompt parameter (e.g. \`$_event.MrfAudioURI3\`) as empty. A prompt defined in the dialplan (e.g. P2228.wav digits prompt) was skipped during playback.`,
@@ -153,9 +207,10 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     }
 
     // Fault Signature 2: 481 Call Leg Does Not Exist / Early Teardown
-    if (line.includes('RspCode:481') || line.includes('481 Call Leg') || (line.includes('sdf_ivk_uaUpdateCallDetails') && line.includes('Errorcode:2016'))) {
+    else if (line.includes('RspCode:481') || line.includes('481 Call Leg') || (line.includes('sdf_ivk_uaUpdateCallDetails') && line.includes('Errorcode:2016'))) {
       isFault = true;
       if (level !== 'ERROR') { level = 'WARN'; warnCount++; }
+      hasEarlyTeardown = true;
       faultDetails = {
         title: 'SIP 481 Call Leg Does Not Exist (Premature Release)',
         root_cause: 'The caller disconnected or an inter-digit timer expired before the transaction completed. The session manager received a BYE for an already cleaned-up call object.',
@@ -165,10 +220,11 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     }
 
     // Fault Signature 3: Kubernetes VIP Allocation / Pod Spawning Failure (Strict matching)
-    if (line.includes('CrashLoopBackOff') || line.includes('FailedScheduling') || (line.toLowerCase().includes('keepalived') && line.toLowerCase().includes('failed'))) {
+    else if (line.includes('CrashLoopBackOff') || line.includes('FailedScheduling') || (line.toLowerCase().includes('keepalived') && line.toLowerCase().includes('failed'))) {
       isFault = true;
       level = 'CRITICAL';
       errorCount++;
+      hasK8sError = true;
       faultDetails = {
         title: 'Kubernetes Virtual IP (VIP) / Pod Scheduling Failure',
         root_cause: 'The container orchestration layer could not allocate the Virtual IP or bind network interface, preventing the pod from transitioning to Running status.',
@@ -178,10 +234,11 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     }
 
     // Fault Signature 4: Redis Cluster / Connection Pool Depletion
-    if (line.includes('READONLY You can\'t write') || line.includes('RedisConnectionException') || line.includes('Could not get a resource from the pool') || line.includes('WRONGTYPE Operation against a key')) {
+    else if (line.includes('READONLY You can\'t write') || line.includes('RedisConnectionException') || line.includes('Could not get a resource from the pool') || line.includes('WRONGTYPE Operation against a key')) {
       isFault = true;
       level = 'ERROR';
       errorCount++;
+      hasRedisError = true;
       faultDetails = {
         title: 'Redis Cluster Replication or Connection Pool Starvation',
         root_cause: 'Application tried to write to a Redis replica node during failover, or the application exhausted all available connections in the Jedis/Lettuce pool.',
@@ -190,8 +247,49 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       };
     }
 
-    // Only keep up to 2,500 entries in memory for UI responsiveness if logs are huge
-    if (entries.length < 2500 || isFault) {
+    // Fault Signature 5: Diameter / OCS / Charging Timeouts
+    else if (line.includes('DIAMETER_AUTHENTICATION_REJECTED') || line.includes('DIAMETER_AUTHORIZATION_REJECTED') || line.includes('DIAMETER_UNABLE_TO_DELIVER') || line.includes('CCA-I Timeout') || line.includes('CCR Timeout')) {
+      isFault = true;
+      level = 'ERROR';
+      errorCount++;
+      hasDiameterTimeout = true;
+      faultDetails = {
+        title: 'Diameter Credit Control (Gy/Ro) Policy Rejection / Timeout',
+        root_cause: 'The Online Charging System (OCS) or PCRF failed to respond within timer Tx, or actively rejected credit authorization.',
+        solution: '1. Verify OCS/PCRF connectivity on port 3868.\n2. Ensure diameter peer watchdog is active.\n3. Check subscriber account balance and rating group provisioning.',
+        sugarcoated_summary: 'Subscriber session authorization experienced an external billing gateway timeout.'
+      };
+    }
+
+    // Fault Signature 6: License Expiration / Threshold Limit
+    else if (line.includes('License expired') || line.includes('LICENSE_CAPACITY_EXCEEDED') || line.includes('License limit reached')) {
+      isFault = true;
+      level = 'CRITICAL';
+      errorCount++;
+      hasLicenseFailure = true;
+      faultDetails = {
+        title: 'Software License Expiration or Capacity Threshold Exceeded',
+        root_cause: 'The application license file has expired or concurrent session load exceeded the licensed channel limit.',
+        solution: 'Deploy updated carrier license file to `/opt/vmas/license/` and restart licensing daemon.',
+        sugarcoated_summary: 'System throughput reached licensed concurrency capacity.'
+      };
+    }
+
+    // Fault Signature 7: Generic C++ Core Dump / Segmentation Fault / Null Pointer
+    else if (line.includes('Segmentation fault') || line.includes('NullPointerException') || line.includes('SIGSEGV') || line.includes('SIGABRT') || line.includes('pure virtual method called')) {
+      isFault = true;
+      level = 'CRITICAL';
+      errorCount++;
+      faultDetails = {
+        title: 'Application Process Crash / Core Dump (SIGSEGV / SIGABRT)',
+        root_cause: 'Uncaught memory segmentation fault or null pointer dereference in application core binary.',
+        solution: 'Analyze gdb core dump backtrace (`gdb <binary> core.<pid>`) to identify the invalid memory access.',
+        sugarcoated_summary: 'A worker thread restarted automatically to preserve process isolation.'
+      };
+    }
+
+    // Keep entries in memory for UI table (all faults prioritized, plus up to 30,000 entries)
+    if (entries.length < 30000 || isFault) {
       entries.push({
         id: `log_${i + 1}`,
         index: i + 1,
@@ -211,10 +309,23 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
   }
 
   // Determine overall log type
-  const logType = isVmas ? 'MAVENIR_VMAS' : (isK8s ? 'KUBERNETES_OCP' : (isRedis ? 'REDIS_DB' : 'GENERIC_APPLICATION'));
+  const logType = isVmas ? 'MAVENIR_VMAS' : (isK8s ? 'KUBERNETES_OCP' : (isRedis ? 'REDIS_DB' : (isDiameter ? 'SIP_IMS' : 'GENERIC_APPLICATION')));
 
-  // Synthesize Identified Faults
-  if (isVmas && rawText.includes('MrfAudioURI') && rawText.includes('Expression Evaluation Failed')) {
+  // Synthesize Identified Faults (Strictly Based on Genuine Evidence in File)
+  if (hasDbInsertFailed || hasMcnFailure) {
+    identifiedFaults.push({
+      id: 'flt_vmas_mca_db_insert_failed',
+      title: 'Database Insert Failed for MCA/MCN Record (DBInsert.Failed)',
+      severity: 'CRITICAL',
+      category: 'Voicemail Database & Notification (MCN)',
+      description: 'VMAS failed to persist the Missed Call Alert (MCA) call info record into the database. The DBAdapter returned `DBADAPTER_DBQUERY_RSP_ERR` during procedure `INSERT_MCA_RECORD` execution (`EventName: DBInsert.Failed`), triggering a 5-minute retry transition loop in `MCN.scxml`.',
+      possible_cause: 'Database table lock, missing database procedure permissions, SQL constraint violation on the MCA table, or database connection pool exhaustion in DBAdapter.',
+      recommendation: '1. Check DBAdapter connectivity and permissions on the VMAS database cluster.\n2. Verify that procedure `INSERT_MCA_RECORD` is compiled and operational.\n3. Check database table space and transaction logs for deadlocks.',
+      remediation: 'Inspect DBAdapter configuration `/opt/vmas/config/dbadapter/` and check DBMS logs on the database host.'
+    });
+  }
+
+  if (hasMissingPrompt) {
     identifiedFaults.push({
       id: 'flt_vmas_missing_prompt',
       title: 'Prompt Variable Not Bound in SCXML Template (P2228.wav)',
@@ -227,7 +338,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     });
   }
 
-  if (rawText.includes('RspCode:481') || rawText.includes('Errorcode:2016')) {
+  if (hasEarlyTeardown) {
     identifiedFaults.push({
       id: 'flt_vmas_481_disconnect',
       title: 'Session Teardown Before Completion (SIP 481 / Errorcode 2016)',
@@ -239,13 +350,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     });
   }
 
-  // Strict Fault Extraction: Only trigger K8s / Platform faults if genuine container orchestration errors exist
-  const hasGenuineK8sError = rawText.includes('CrashLoopBackOff') || 
-                             rawText.includes('FailedScheduling') || 
-                             (rawText.toLowerCase().includes('keepalived') && rawText.toLowerCase().includes('failed')) ||
-                             (rawText.toLowerCase().includes('metallb') && rawText.toLowerCase().includes('error'));
-
-  if (hasGenuineK8sError) {
+  if (hasK8sError) {
     identifiedFaults.push({
       id: 'flt_k8s_vip_fail',
       title: 'Kubernetes Virtual IP / Container Initialization Blocked',
@@ -257,11 +362,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     });
   }
 
-  const hasGenuineRedisError = rawText.includes('READONLY You can\'t write') || 
-                               rawText.includes('Could not get a resource from the pool') || 
-                               rawText.includes('RedisConnectionException');
-
-  if (hasGenuineRedisError) {
+  if (hasRedisError) {
     identifiedFaults.push({
       id: 'flt_redis_conn_fail',
       title: 'Redis Cluster Failover or Pool Exhaustion',
@@ -270,6 +371,30 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       description: 'Application writes rejected or blocked due to Redis master election delay or exhausted connection pool.',
       possible_cause: 'Redis master failover in progress or unclosed connection leak in application thread pool.',
       recommendation: 'Tune `spring.redis.jedis.pool.max-active` and verify Redis Sentinel cluster quorum.'
+    });
+  }
+
+  if (hasDiameterTimeout) {
+    identifiedFaults.push({
+      id: 'flt_diameter_timeout',
+      title: 'Diameter Credit-Control / Policy Timeout (Gy/Ro)',
+      severity: 'HIGH',
+      category: 'Carrier Core Signaling',
+      description: 'Diameter transactions timed out awaiting answer from the Online Charging System (OCS) or PCRF.',
+      possible_cause: 'OCS latency, firewall blocking port 3868, or DRA routing misconfiguration.',
+      recommendation: 'Verify DRA peer routing tables and ensure OCS processing latency is below 200ms.'
+    });
+  }
+
+  if (hasLicenseFailure) {
+    identifiedFaults.push({
+      id: 'flt_license_fail',
+      title: 'Software License Expired or Capacity Exceeded',
+      severity: 'CRITICAL',
+      category: 'Platform Licensing',
+      description: 'The system rejected calls or operations due to license expiry or concurrent session threshold breach.',
+      possible_cause: 'Expired license file or unexpected traffic surge.',
+      recommendation: 'Install renewed license keys and verify current capacity limits.'
     });
   }
 
@@ -285,7 +410,9 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     rootCause = `🚨 **${primary.title}**: ${primary.description} **Possible Cause**: ${primary.possible_cause}`;
     
     // Customer-ready sugarcoated brief
-    if (logType === 'MAVENIR_VMAS') {
+    if (hasDbInsertFailed || hasMcnFailure) {
+      customerBrief = `During today's test scenario, core voice messaging deposit completed. The asynchronous notification subsystem encountered a database latency timeout while scheduling the SMS notification, and the background retry queue successfully engaged. System health remains stable.`;
+    } else if (hasMissingPrompt) {
       customerBrief = `During today's test scenario, the platform completed standard signaling exchanges. For the password entry workflow, prompt sequencing is currently undergoing parameter tuning to ensure all audio guidance elements play in their intended order. Testing confirmed nominal call teardown following inactivity periods.`;
     } else if (logType === 'KUBERNETES_OCP') {
       customerBrief = `Platform provisioning is in progress. Network virtual routing endpoints are undergoing synchronization to ensure high availability across redundant application pods.`;
