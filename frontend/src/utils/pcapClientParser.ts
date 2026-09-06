@@ -853,6 +853,55 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaRecommendations.push('Check Diameter peer connection status on ASBC: `show diameter peer-status rx`.');
     rcaRecommendations.push('Inspect PCRF server health, CPU load, and DRA Diameter routing tables.');
     rcaRecommendations.push('Adjust ASBC Rx request timer (`rx_aaa_timeout_ms`) or enable Rx Bypass Fallback to prevent dropping calls during policy delays.');
+  } else if (responseCodes['500 Server Internal Error'] || responseCodes['500']) {
+    rcaTitle = 'Root Cause Identified: Core Node Internal Exception (SIP 500)';
+    rcaVerdict = '🚨 **Root Cause Identified (Core Node Crash/Exception)**: Downstream SIP servlet or core element (S-CSCF/TAS/HSS) returned `500 Server Internal Error`.';
+    rcaPlainEnglish = 'The call failed because a core network server crashed or encountered an unhandled software exception during session processing. Check core application server logs and database connectivity.';
+    rcaRecommendations.push('Inspect container stderr logs on the core server (S-CSCF/TAS) to identify the throwing exception.');
+    rcaRecommendations.push('Verify backend database (Cassandra/MariaDB) connection latency and schema validation.');
+  } else if (responseCodes['488 Not Acceptable Here'] || responseCodes['488'] || responseCodes['606 Not Acceptable']) {
+    rcaTitle = 'Root Cause Identified: Codec / SDP Media Negotiation Incompatible (SIP 488)';
+    rcaVerdict = '🚨 **Root Cause Identified (Media Mismatch)**: Downstream gateway or subscriber UE rejected the SDP offer with `488 Not Acceptable Here`. None of the proposed audio codecs or packetization settings matched.';
+    rcaPlainEnglish = 'The call was rejected because the caller and receiver do not share a compatible audio codec. Enable media transcoding on the MRFP/ATGW (e.g. AMR-WB to G.711).';
+    rcaRecommendations.push('Enable media transcoding on the MRFP / ATGW for AMR-WB (16kHz) to G.711 (PCMU/A).');
+    rcaRecommendations.push('Verify SDP mode-change-capability and AMR-WB octet-align vs bandwidth-efficient mode alignment on the SBC.');
+  } else if (responseCodes['403 Forbidden'] || responseCodes['403']) {
+    rcaTitle = 'Root Cause Identified: Subscriber Access Barring / Forbidden (SIP 403)';
+    rcaVerdict = '🚨 **Root Cause Identified (Security & Barring)**: Core network rejected signaling transaction with `403 Forbidden`. The subscriber is not authorized for IMS service or roaming on this visited PLMN.';
+    rcaPlainEnglish = 'The call was blocked by the carrier core because the subscriber profile has barring active, lacks roaming permission, or has an IPsec security association mismatch.';
+    rcaRecommendations.push('Verify subscriber provisioning, active roaming agreements, and subscription status in HSS/UDM.');
+    rcaRecommendations.push('Check P-Asserted-Identity against subscriber profile and inspect P-CSCF IPsec SPI security associations.');
+  } else if (responseCodes['404 Not Found'] || responseCodes['404']) {
+    rcaTitle = 'Root Cause Identified: Dialed MSISDN / Subscriber Unallocated (SIP 404)';
+    rcaVerdict = '⚠️ **Root Cause Identified (Routing / Number Error)**: S-CSCF, BGCF, or ENUM server returned `404 Not Found` for the dialed destination number.';
+    rcaPlainEnglish = 'The call failed because the dialed telephone number is unallocated, formatted incorrectly, or missing from the subscriber database. Ensure proper E.164 (+country code) dialing format.';
+    rcaRecommendations.push('Verify Request-URI and To header formatting (ensure E.164 +country code prefix).');
+    rcaRecommendations.push('Inspect ENUM/LNP routing queries and check subscriber provisioning in HSS/UDM.');
+  } else if (responseCodes['480 Temporarily Unavailable'] || responseCodes['480']) {
+    rcaTitle = 'Root Cause Identified: Radio Paging Timeout / Subscriber Detached (SIP 480)';
+    rcaVerdict = '⚠️ **Root Cause Identified (Radio Paging Timeout)**: Destination handset did not respond to LTE/5G S1AP radio paging before the paging guard timer expired.';
+    rcaPlainEnglish = 'The call could not be completed because the recipient phone is out of coverage, powered off without de-registering, or experiencing radio signal degradation.';
+    rcaRecommendations.push('Inspect MME/AMF paging attempt counters and eNodeB/gNodeB S1AP paging success rates.');
+    rcaRecommendations.push('Verify RF cell coverage and check for radio link failure (RLF) alarms in the target tracking area.');
+  } else if (isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
+    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'];
+    rcaTitle = 'Root Cause Identified: VMAS IVR Prompt Timeout / Early Disconnect (SIP 487)';
+    rcaVerdict = `⚠️ **Root Cause Identified (VMAS Session Cancellation)**: Observed ${termCount} occurrences of ` + '`SIP 487 Request Terminated`' + ' in VMAS dialogs. Occurs when a caller disconnects during greeting playback or an IVR inter-digit prompt timer expires.';
+    rcaPlainEnglish = 'The voicemail session was released because the caller hung up during prompt playback or waited too long between digit presses. If unexpected, adjust VMAS prompt and silence detection timers.';
+    rcaRecommendations.push('Tune VMAS application server prompt timeout timer (`prompt_timeout_sec`) from 5s to 8s.');
+    rcaRecommendations.push('Verify MRFP greeting audio stream stability and silence detection thresholds.');
+  } else if (!isVmasTrace && (responseCodes['487 Request Terminated'] || responseCodes['487'])) {
+    const termCount = responseCodes['487 Request Terminated'] || responseCodes['487'];
+    rcaTitle = 'Session Analysis: Client Call Cancellation (SIP 487 Request Terminated)';
+    rcaVerdict = `ℹ️ **Call Canceled by Originator**: Observed ${termCount} occurrences of ` + '`SIP 487 Request Terminated`' + '. Calling party hung up (sent SIP CANCEL) before the remote phone was answered.';
+    rcaPlainEnglish = 'The call was canceled by the caller before the remote party picked up. This is standard telephony behavior and indicates no core network defect.';
+    rcaRecommendations.push('Standard caller release behavior. No network engineering action required.');
+  } else if (responseCodes['486 Busy Here'] || responseCodes['486']) {
+    const busyCount = responseCodes['486 Busy Here'] || responseCodes['486'];
+    rcaTitle = 'Session Analysis: Callee Busy / Call Forwarding Triggered (SIP 486)';
+    rcaVerdict = `ℹ️ **Recipient Engaged (SIP 486 Busy Here)**: Observed ${busyCount} occurrences of ` + '`486 Busy Here`' + '. Remote handset is engaged in another active call or Do-Not-Disturb (DND) is active.';
+    rcaPlainEnglish = 'The called party was engaged on another call. The network correctly signaled 486 Busy Here and forwarded the call to voicemail/announcement per carrier supplementary service rules.';
+    rcaRecommendations.push('Verify Call Waiting (CW / 3GPP TS 24.615) configuration on subscriber profile if call waiting is desired.');
   } else if (responseCodes['503 Service Unavailable'] || responseCodes['503']) {
     rcaTitle = 'Root Cause Identified: Downstream Proxy / Core Server Exhaustion (SIP 503)';
     rcaVerdict = '🚨 **Root Cause Identified (Server Overload)**: Downstream SIP proxy or application server returned 503 Service Unavailable, rejecting incoming signaling sessions.';

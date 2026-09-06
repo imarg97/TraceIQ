@@ -706,6 +706,138 @@ To get rid of this issue and restore mobile data connectivity for the subscriber
       };
     }
 
+    // RCA Scenario D1: Core Node Internal Exception (SIP 500)
+    const has500 = respCodes['500 Server Internal Error'] || respCodes['500'];
+    if (has500) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: 🚨 **Root Cause: Core Node Internal Exception (SIP 500 Server Internal Error)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* Downstream core proxy or Application Server (S-CSCF / TAS / HSS) crashed or threw an uncaught exception while processing incoming signaling.
+* **Failure Mechanism**: Database timeout, corrupt subscriber profile XML, or null pointer exception in SIP servlet container.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Inspect Core Container Logs**: Check stderr logs and heap dump metrics on the target application node.
+2. **Verify Database Health**: Inspect backend Cassandra/MariaDB query response times and table space.`,
+        provider: 'TraceIQ Autonomous Core Node Diagnostician'
+      };
+    }
+
+    // RCA Scenario D2: Media / Codec Negotiation Mismatch (SIP 488 / 606)
+    const has488 = respCodes['488 Not Acceptable Here'] || respCodes['488'] || respCodes['606 Not Acceptable'];
+    if (has488) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: 🚨 **Root Cause: SDP Codec / Media Negotiation Incompatible (SIP 488 Not Acceptable Here)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* The remote gateway or mobile handset rejected the SDP offer because none of the proposed audio codecs (EVS / AMR-WB / G.711) or packetization parameters match its supported capabilities.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Enable MRFP Transcoding**: Configure MRFP / ATGW transcoding between AMR-WB (16kHz) and G.711 (PCMU/A).
+2. **Align SBC Media Profiles**: Verify AMR-WB octet-align vs bandwidth-efficient mode alignment.`,
+        provider: 'TraceIQ Autonomous Media & SDP Diagnostician'
+      };
+    }
+
+    // RCA Scenario D3: Subscriber Access Barring (SIP 403)
+    const has403 = respCodes['403 Forbidden'] || respCodes['403'];
+    if (has403) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: 🚨 **Root Cause: Subscriber Barring / Identity Access Denied (SIP 403 Forbidden)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* P-CSCF or S-CSCF rejected signaling transaction with \`403 Forbidden\`. The subscriber account lacks roaming permissions on this visited PLMN or has active access barring.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Check HSS Provisioning**: Verify subscriber roaming profile and IMS service authorization in HSS/UDM.
+2. **Inspect P-CSCF Security**: Check P-Asserted-Identity header and verify IPsec SPI associations.`,
+        provider: 'TraceIQ Autonomous Security Diagnostician'
+      };
+    }
+
+    // RCA Scenario D4: Destination Unallocated / Number Not Found (SIP 404)
+    const has404 = respCodes['404 Not Found'] || respCodes['404'];
+    if (has404) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: ⚠️ **Root Cause: Dialed MSISDN / Subscriber Unallocated (SIP 404 Not Found)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* The S-CSCF or ENUM server returned \`404 Not Found\` for the dialed destination number. The number is missing from the database or formatted incorrectly.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Verify E.164 Format**: Ensure Request-URI and To headers include valid country code prefixes (e.g. \`+57...\`).
+2. **Check HSS / ENUM**: Inspect ENUM DNS routing table and HSS subscriber database.`,
+        provider: 'TraceIQ Autonomous Routing Diagnostician'
+      };
+    }
+
+    // RCA Scenario D5: Radio Paging Timeout (SIP 480)
+    const has480 = respCodes['480 Temporarily Unavailable'] || respCodes['480'];
+    if (has480) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: ⚠️ **Root Cause: Radio Paging Timeout / Subscriber Detached (SIP 480 Temporarily Unavailable)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* Destination mobile handset did not respond to LTE/5G S1AP radio paging before the network guard timer expired.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Inspect MME/AMF Counters**: Check S1AP paging success rate in the target tracking area.
+2. **Check RF Coverage**: Verify radio coverage and inspect cell alarm history.`,
+        provider: 'TraceIQ Autonomous RAN Diagnostician'
+      };
+    }
+
+    // RCA Scenario D6: VMAS Prompt Timeout / Early Disconnect (SIP 487)
+    if (isVmasTrace && has487) {
+      return {
+        answer: `### 🎯 Root Cause Analysis (RCA) for \`${fileName}\`
+
+**Executive Verdict**: ⚠️ **Root Cause: VMAS IVR Prompt Timeout / Early Disconnect (SIP 487 Request Terminated)**
+
+---
+
+### 🔍 1. Technical Diagnosis:
+* In the VMAS voicemail dialog, the caller disconnected during greeting playback or an IVR inter-digit prompt timer expired before message recording started.
+
+---
+
+### 🛠️ 2. Remediation:
+1. **Tune Prompt Timers**: Increase VMAS prompt timeout (\`prompt_timeout_sec\`) from 5s to 8s.
+2. **Verify Silence Detection**: Check MRFP \`final_silence_timeout\` to avoid premature call teardowns.`,
+        provider: 'TraceIQ Autonomous VMAS Diagnostician'
+      };
+    }
+
     // RCA Scenario D: Server Overload (503 Service Unavailable)
     if (has503) {
       return {
