@@ -70,6 +70,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenUpload }) => {
             className="h-8 w-auto object-contain"
           />
           <span className="font-heading font-bold text-ag-primary text-xl tracking-tight">TraceIQ</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-emerald-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span>PHASE 2 ENGINE</span>
+          </span>
         </div>
         
         {/* Navigation Tabs */}
