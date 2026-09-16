@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTraceStore } from '../../store/useTraceStore';
-import { formatInlineMarkdown } from '../../utils/formatMarkdown';
+import { formatInlineMarkdown, formatStructuredList } from '../../utils/formatMarkdown';
 import { AlertTriangle, ShieldCheck, CheckCircle2, ArrowRight, ExternalLink } from 'lucide-react';
 
 export const IssueEngineView: React.FC = () => {
@@ -226,21 +226,21 @@ export const IssueEngineView: React.FC = () => {
 
                 {/* Root Cause & Remediation Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
-                  <div className="tcq-card-subtle p-3.5 rounded-xl space-y-1 border">
+                  <div className="tcq-card-subtle p-3.5 rounded-xl space-y-1.5 border">
                     <span className="text-[10px] font-bold tcq-text-muted uppercase tracking-wider block">
                       Probable Root Cause:
                     </span>
                     <div className="text-xs font-semibold tcq-text-title">
-                      {formatInlineMarkdown(iss.possible_cause || iss.root_cause || 'Signaling timeout.')}
+                      {formatStructuredList(iss.possible_cause || iss.root_cause || 'Signaling timeout.', 'indigo')}
                     </div>
                   </div>
 
-                  <div className="tcq-card-subtle p-3.5 rounded-xl space-y-1 border">
+                  <div className="tcq-card-subtle p-3.5 rounded-xl space-y-1.5 border">
                     <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">
                       Recommended Engineering Remediation:
                     </span>
                     <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
-                      {formatInlineMarkdown(iss.recommendation || iss.remediation || 'Inspect downstream node logs.')}
+                      {formatStructuredList(iss.recommendation || iss.remediation || 'Inspect downstream node logs.', 'emerald')}
                     </div>
                   </div>
                 </div>

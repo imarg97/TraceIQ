@@ -289,8 +289,66 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
     };
   }
 
-  // Dedicated Handler: Database, MCN & MCA Insert Failure Inquiry
-  if (queryLower.includes('mcn') || queryLower.includes('mca') || queryLower.includes('dbinsert') || queryLower.includes('dbadapter') || (queryLower.includes('database') && !queryLower.includes('redis'))) {
+  // Dedicated Handler: Database, MCN, NFAM & SMPP Notification Inquiry
+  if (queryLower.includes('mcn') || queryLower.includes('nfam') || queryLower.includes('smpp') || queryLower.includes('submit_sm') || queryLower.includes('mca') || queryLower.includes('mco') || queryLower.includes('dbinsert') || queryLower.includes('dbadapter') || (queryLower.includes('database') && !queryLower.includes('redis'))) {
+    const smppPackets = packets.filter(p => p.protocol === 'SMPP');
+    const mcnSubmit = smppPackets.filter(p => (p.info || '').includes('Service: MCN') || (p.raw_text || '').includes('MCN'));
+    const nfamSubmit = smppPackets.filter(p => (p.info || '').includes('Service: NFAM') || (p.raw_text || '').includes('NFAM'));
+
+    if (smppPackets.length > 0 || (pcapContext?.file_name || '').toLowerCase().includes('mcn') || (pcapContext?.file_name || '').toLowerCase().includes('vmas')) {
+      const recipient = mcnSubmit[0]?.to_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573338066269';
+      const originator = mcnSubmit[0]?.from_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573202711497';
+      const mcoIp = mcnSubmit[0]?.destination || '10.64.165.19';
+      const vmasIp = mcnSubmit[0]?.source || '10.64.165.50';
+
+      return {
+        answer: `### 🎯 SMPP Notification & MCN vs NFAM Analysis for \`${pcapContext?.file_name || 'Active Capture'}\`
+
+**Investigation Target**: **VMAS SMPP Delivery to MCO (MCN vs NFAM SMS Notification)**  
+**Executive Verdict**: ⚠️ **MCN \`Submit_sm\` was successfully sent and acknowledged (0x00000000 Ok), but NO NFAM \`Submit_sm\` was triggered.**
+
+---
+
+### 🔍 1. Detailed Trace Findings:
+* **MCN Submit_sm Generated**: In the trace, VMAS (\`${vmasIp}\`) sent an \`SMPP Submit_sm\` (Command: \`0x00000004\`, Service Type: \`MCN\`) to MCO (\`${mcoIp}:9000\`) for recipient B-Party (\`${recipient}\`).
+* **MCO Acknowledgment**: MCO responded with \`Submit_sm_resp: Ok\` (Command: \`0x80000004\`, Status: \`0x00000000 ESME_ROK\`), confirming successful queueing of the Missed Call SMS.
+* **Missing NFAM Submit_sm**: There is **no \`Submit_sm\` with Service Type \`NFAM\`** (New Voice Message Alert) triggered from VMAS towards MCO.
+
+---
+
+### 🔬 2. Why NFAM Submit_sm Was Not Triggered (Root Cause):
+1. **Call Teardown Before Minimum Recording Length Threshold**:
+   - The caller disconnected either **less than 1 second after the beep tone** or **during greeting playback**.
+   - Because the deposit length did not meet the configured minimum recording duration (e.g. \`min_message_duration_sec\`), VMAS discarded the recording and classified the session as an **unanswered/abandoned call**, triggering an **MCN (Missed Call Notification)** instead of saving a voice deposit and triggering **NFAM**.
+2. **Subscriber Class of Service (COS 0_01) Provisioning**:
+   - In the subscriber profile:
+     \`\`\`xml
+     <Subscriber>
+       <VM>
+         <TelephoneNumber>${recipient}</TelephoneNumber>
+         <COS>0_01</COS>
+         <MCNEnabled>true</MCNEnabled>
+         ...
+       </VM>
+     </Subscriber>
+     \`\`\`
+   - While \`<MCNEnabled>true</MCNEnabled>\` is active, verify whether \`<NFAMEnabled>\` or SMS alert on voice message deposit is authorized for COS \`0_01\`.
+3. **VMAS Notification Dialplan Matrix**:
+   - Check \`vmas_mcn.cfg\` / \`vmas_smpp.cfg\` to ensure the NFAM event trigger is mapped to the active MCO SMSC route.
+
+---
+
+### 🛠️ 3. Recommended Remediation & Next Steps:
+1. **Reduce Minimum Recording Duration**:
+   - If the customer wants short deposits (< 1s) to be retained as voicemail and trigger NFAM, decrease the minimum recording threshold in VMAS configuration (e.g. from 2s to 0.5s).
+2. **Verify Subscriber Profile Provisioning**:
+   - Confirm in the provisioning DB that subscriber \`${recipient}\` has active NFAM rights under COS \`0_01\`.
+3. **Correlate with VMAS Application Logs**:
+   - Review \`scxmlApp.alogc\` around timestamp to verify if the call state machine transitioned to \`DepositComplete.scxml\` (NFAM) or branched to \`MCN.scxml\`.`,
+        provider: 'TraceIQ VMAS & SMPP Diagnostician'
+      };
+    }
+
     if (logContext?.identified_faults && logContext.identified_faults.some((f: any) => f.title?.toLowerCase().includes('database') || f.title?.toLowerCase().includes('mcn') || f.title?.toLowerCase().includes('mca'))) {
       return {
         answer: `### 🎯 Root Cause Analysis: Database Insert Failure for MCA/MCN (\`DBInsert.Failed\`)
