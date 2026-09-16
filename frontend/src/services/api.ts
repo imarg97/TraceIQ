@@ -57,23 +57,7 @@ export async function loadSamplePcap(sampleId: string): Promise<PCAPAnalysisResu
 }
 
 export async function uploadPcapFile(file: File): Promise<PCAPAnalysisResult> {
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const res = await fetch(`${API_BASE}/pcap/upload`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // Backend offline or unreachable — fallback seamlessly to client-side binary parser
-  }
-
-  // Parse directly from client ArrayBuffer
+  // Parse directly from client ArrayBuffer for zero-latency, deterministic in-browser analysis
   const buffer = await file.arrayBuffer();
   return await parsePcapArrayBuffer(buffer, file.name);
 }

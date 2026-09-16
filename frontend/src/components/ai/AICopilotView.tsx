@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useTraceStore } from '../../store/useTraceStore';
 import { askTelecomAI } from '../../services/api';
-import { formatInlineMarkdown } from '../../utils/formatMarkdown';
+import { formatInlineMarkdown, formatStructuredList } from '../../utils/formatMarkdown';
 import { 
   Brain, 
   FileText, 
@@ -144,9 +144,9 @@ export const AICopilotView: React.FC = () => {
 * **Recommended Action**: ${topFault.recommendation || 'Tune application dialplan parameters.'}`;
     } else if (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW') {
       const topIssue = currentPcap.issues[0];
+      const rec = topIssue.recommendation ? `\n\n### 🛠️ Recommended Engineering Remediation:\n${topIssue.recommendation}` : '';
       rcaContent = `\n\n### 🚨 Detected Signaling Fault:
-* **${topIssue.title}**: ${topIssue.possible_cause || topIssue.description}
-* **Recommended Action**: ${topIssue.recommendation || 'Inspect core routing parameters.'}`;
+* **${topIssue.title}**: ${topIssue.possible_cause || topIssue.description}${rec}`;
     } else {
       rcaContent = `\n\n### ✅ Automated Health Verdict:
 All transactions executed normally with zero signaling faults. Health score is **${currentPcap?.health_score || 98}%**.`;
@@ -392,15 +392,17 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                     <ShieldCheck className="w-3.5 h-3.5 text-ag-primary" />
                     <span>Technical Verdict</span>
                   </div>
-                  <p>{formatInlineMarkdown(
-                    (currentLog?.identified_faults && currentLog.identified_faults.length > 0)
-                      ? currentLog.root_cause
-                      : (currentPcap?.linked_logs?.identified_faults && currentPcap.linked_logs.identified_faults.length > 0)
-                        ? currentPcap.linked_logs.root_cause
-                        : (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW')
-                          ? `🚨 **${currentPcap.issues[0].title}**: ${currentPcap.issues[0].description} **Recommended Remediation**: ${currentPcap.issues[0].recommendation}`
-                          : (currentPcap?.ai_analysis?.root_cause || currentPcap?.ai_analysis?.executive_summary || 'System executed nominal transactions with zero signaling faults.')
-                  )}</p>
+                  <div className="leading-relaxed">
+                    {formatInlineMarkdown(
+                      (currentLog?.identified_faults && currentLog.identified_faults.length > 0)
+                        ? currentLog.root_cause
+                        : (currentPcap?.linked_logs?.identified_faults && currentPcap.linked_logs.identified_faults.length > 0)
+                          ? currentPcap.linked_logs.root_cause
+                          : (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW')
+                            ? `🚨 **${currentPcap.issues[0].title}**: ${currentPcap.issues[0].possible_cause || currentPcap.issues[0].description}`
+                            : (currentPcap?.ai_analysis?.root_cause || currentPcap?.ai_analysis?.executive_summary || 'System executed nominal transactions with zero signaling faults.')
+                    )}
+                  </div>
                 </div>
 
                 {/* Prescribed Solutions & Action Items */}
@@ -408,21 +410,17 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     Recommended Actions & Remediation
                   </div>
-                  <div className="space-y-1.5">
-                    {(
+                  <div className="text-xs">
+                    {formatStructuredList(
                       (currentLog?.action_plan && currentLog.action_plan.length > 0)
-                        ? currentLog.action_plan
+                        ? currentLog.action_plan.join('\n')
                         : (currentPcap?.linked_logs?.action_plan && currentPcap.linked_logs.action_plan.length > 0)
-                          ? currentPcap.linked_logs.action_plan
+                          ? currentPcap.linked_logs.action_plan.join('\n')
                           : (currentPcap?.issues && currentPcap.issues.length > 0 && currentPcap.issues[0]?.severity !== 'LOW')
-                            ? [currentPcap.issues[0].recommendation]
-                            : (currentPcap?.ai_analysis?.recommendations || ['Verify standard service metrics.'])
-                    ).map((rec, rIdx) => (
-                      <div key={rIdx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-700 dark:text-slate-300 flex items-start gap-2 font-sans">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <span className="leading-snug">{formatInlineMarkdown(rec)}</span>
-                      </div>
-                    ))}
+                            ? (currentPcap.issues[0].recommendation || currentPcap.issues[0].remediation || 'Inspect core routing parameters.')
+                            : (currentPcap?.ai_analysis?.recommendations?.join('\n') || 'Verify standard service metrics.'),
+                      'emerald'
+                    )}
                   </div>
                 </div>
               </div>

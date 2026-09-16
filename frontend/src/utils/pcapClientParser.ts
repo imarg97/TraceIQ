@@ -433,6 +433,184 @@ export function parseSmppPdu(
   };
 }
 
+function dissectPacketPayload(
+  pktBytes: Uint8Array,
+  inclLen: number,
+  l2LinkType: number,
+  pktTimestampSec: number,
+  tsSec: number,
+  tsUsec: number,
+  firstTimestamp: number,
+  baseDate: Date,
+  pktIndex: number,
+  textDecoder: TextDecoder
+): { pktInfo: PacketInfo; isSip: boolean; protoName: string; srcIp: string; dstIp: string; sipParsed: any; smppParsed: SmppDissection | null; displayInfo: string; relTime: number } {
+  const relTime = Math.max(0, pktTimestampSec - firstTimestamp);
+  let srcIp = '10.70.26.74';
+  let dstIp = '10.88.29.6';
+  let protoName = 'UDP';
+  let sport = 5060;
+  let dport = 5060;
+  let payloadOffset = 0;
+
+  // Determine Layer 2 Header Length
+  let l2HeaderLen = 14;
+  let isIPv4 = false;
+
+  if (l2LinkType === 113 || (inclLen >= 16 && pktBytes[14] === 0x08 && pktBytes[15] === 0x00)) {
+    // Linux Cooked Capture v1 (SLL) - 16 bytes L2
+    l2HeaderLen = 16;
+    isIPv4 = (pktBytes[14] === 0x08 && pktBytes[15] === 0x00);
+  } else if (l2LinkType === 276 || (inclLen >= 20 && pktBytes[0] === 0x08 && pktBytes[1] === 0x00)) {
+    // Linux Cooked Capture v2 (SLL2) - 20 bytes L2
+    l2HeaderLen = 20;
+    isIPv4 = (pktBytes[0] === 0x08 && pktBytes[1] === 0x00);
+  } else if (l2LinkType === 1 || (inclLen >= 14 && pktBytes[12] === 0x08 && pktBytes[13] === 0x00)) {
+    // Standard Ethernet II - 14 bytes L2
+    l2HeaderLen = 14;
+    isIPv4 = true;
+  } else if (l2LinkType === 101 || l2LinkType === 12 || (inclLen >= 20 && (pktBytes[0] >> 4) === 4)) {
+    // Raw IPv4 - 0 bytes L2
+    l2HeaderLen = 0;
+    isIPv4 = true;
+  }
+
+  // Dissect IPv4 + Transport
+  if (isIPv4 && inclLen >= l2HeaderLen + 20) {
+    const ipProto = pktBytes[l2HeaderLen + 9];
+    srcIp = `${pktBytes[l2HeaderLen + 12]}.${pktBytes[l2HeaderLen + 13]}.${pktBytes[l2HeaderLen + 14]}.${pktBytes[l2HeaderLen + 15]}`;
+    dstIp = `${pktBytes[l2HeaderLen + 16]}.${pktBytes[l2HeaderLen + 17]}.${pktBytes[l2HeaderLen + 18]}.${pktBytes[l2HeaderLen + 19]}`;
+    const ipHeaderLen = (pktBytes[l2HeaderLen] & 0x0f) * 4;
+    const transportOffset = l2HeaderLen + ipHeaderLen;
+
+    if (ipProto === 17 && inclLen >= transportOffset + 8) { // UDP
+      sport = (pktBytes[transportOffset] << 8) | pktBytes[transportOffset + 1];
+      dport = (pktBytes[transportOffset + 2] << 8) | pktBytes[transportOffset + 3];
+      payloadOffset = transportOffset + 8;
+      
+      if (sport === 5060 || dport === 5060 || sport === 5070 || dport === 5070 || sport === 5080 || dport === 5080) {
+        protoName = 'SIP';
+      } else if (sport === 53 || dport === 53) {
+        protoName = 'DNS';
+      } else if (sport === 3868 || dport === 3868) {
+        protoName = 'DIAMETER';
+      } else if (payloadOffset < inclLen && (pktBytes[payloadOffset] & 0xc0) === 0x80 && (sport >= 8000 || dport >= 8000)) {
+        protoName = 'RTP';
+      } else {
+        protoName = 'UDP';
+      }
+    } else if (ipProto === 6 && inclLen >= transportOffset + 20) { // TCP
+      sport = (pktBytes[transportOffset] << 8) | pktBytes[transportOffset + 1];
+      dport = (pktBytes[transportOffset + 2] << 8) | pktBytes[transportOffset + 3];
+      const tcpHeaderLen = ((pktBytes[transportOffset + 12] >> 4) & 0x0f) * 4;
+      payloadOffset = transportOffset + tcpHeaderLen;
+      
+      if (sport === 5060 || dport === 5060 || sport === 5070 || dport === 5070 || sport === 5080 || dport === 5080) {
+        protoName = 'SIP';
+      } else if (sport === 9000 || dport === 9000 || sport === 2775 || dport === 2775 || sport === 15171 || dport === 15171 || sport === 5016 || dport === 5016) {
+        protoName = 'SMPP';
+      } else if (payloadOffset + 16 <= inclLen) {
+        const candidateCmdId = ((pktBytes[payloadOffset + 4] << 24) | (pktBytes[payloadOffset + 5] << 16) | (pktBytes[payloadOffset + 6] << 8) | pktBytes[payloadOffset + 7]) >>> 0;
+        if (SMPP_COMMAND_NAMES[candidateCmdId]) {
+          protoName = 'SMPP';
+        } else {
+          protoName = 'TCP';
+        }
+      } else {
+        protoName = 'TCP';
+      }
+    } else if (ipProto === 132) { // SCTP
+      protoName = 'SCTP';
+      payloadOffset = transportOffset + 12;
+    } else if (ipProto === 50) { // ESP
+      protoName = 'ESP';
+      payloadOffset = transportOffset;
+    }
+  }
+
+  // Check text payload for SIP or VMAS
+  let rawText = '';
+  let hexSnippet = '';
+  for (let b = 0; b < Math.min(inclLen, 64); b++) {
+    hexSnippet += pktBytes[b].toString(16).padStart(2, '0') + ' ';
+  }
+  hexSnippet = hexSnippet.trim();
+
+  if (payloadOffset > 0 && payloadOffset < inclLen) {
+    try {
+      rawText = textDecoder.decode(pktBytes.subarray(payloadOffset));
+    } catch {
+      rawText = '';
+    }
+  } else {
+    try {
+      rawText = textDecoder.decode(pktBytes);
+    } catch {
+      rawText = '';
+    }
+  }
+
+  const { isSip, cleanText } = cleanSipString(rawText);
+  if (isSip) {
+    protoName = 'SIP';
+  }
+
+  const sipParsed: ReturnType<typeof parseSipHeaders> = isSip 
+    ? parseSipHeaders(cleanText, srcIp, dstIp) 
+    : { info: '' };
+
+  let smppParsed: SmppDissection | null = null;
+  if (protoName === 'SMPP') {
+    smppParsed = parseSmppPdu(pktBytes, payloadOffset, inclLen, srcIp, dstIp);
+  }
+
+  let displayInfo = isSip ? (sipParsed.info || 'SIP Message') : `${protoName} (${sport} → ${dport}) Len=${inclLen}`;
+  if (protoName === 'SMPP' && smppParsed) {
+    displayInfo = smppParsed.info;
+  } else if (protoName === 'RTP') {
+    const pt = payloadOffset < inclLen ? (pktBytes[payloadOffset + 1] & 0x7f) : 0;
+    const seq = payloadOffset + 3 < inclLen ? ((pktBytes[payloadOffset + 2] << 8) | pktBytes[payloadOffset + 3]) : 0;
+    displayInfo = `RTP Audio Stream PT=${pt} Seq=${seq} (${sport} → ${dport})`;
+  } else if (protoName === 'UDP' && (sport === 5060 || dport === 5060)) {
+    displayInfo = `UDP (5060 → 5060) Keepalive Len=${inclLen}`;
+  }
+
+  const pktInfo: PacketInfo = {
+    id: `pkt_${pktIndex}`,
+    index: pktIndex,
+    time: relTime,
+    timestamp_str: formatTimestamp(tsSec, tsUsec, baseDate),
+    source: srcIp,
+    destination: dstIp,
+    protocol: protoName,
+    length: inclLen,
+    info: displayInfo,
+    sip_method: sipParsed.sip_method,
+    response_code: sipParsed.response_code,
+    call_id: isSip ? sipParsed.call_id : (smppParsed ? `SMPP_Seq_${smppParsed.sequence_number}` : undefined),
+    from_header: isSip ? sipParsed.from_header : (smppParsed?.source_addr ? `<tel:${smppParsed.source_addr}>` : undefined),
+    to_header: isSip ? sipParsed.to_header : (smppParsed?.destination_addr ? `<tel:${smppParsed.destination_addr}>` : undefined),
+    via: sipParsed.via,
+    cseq: isSip ? sipParsed.cseq : (smppParsed ? `${smppParsed.sequence_number} ${smppParsed.command_name}` : undefined),
+    contact: sipParsed.contact,
+    user_agent: sipParsed.user_agent,
+    content_type: isSip ? sipParsed.content_type : (protoName === 'SMPP' ? 'application/octet-stream (SMPP PDU)' : undefined),
+    content_length: isSip ? sipParsed.content_length : String(inclLen - payloadOffset),
+    expires: sipParsed.expires,
+    authorization: sipParsed.authorization,
+    www_authenticate: sipParsed.www_authenticate,
+    body: sipParsed.body,
+    sdp: sipParsed.sdp,
+    raw_text: isSip ? cleanText : (smppParsed ? `[SMPP PDU: ${smppParsed.info}]\nCommand: ${smppParsed.command_name}\nStatus: ${smppParsed.status_name}\nSequence: ${smppParsed.sequence_number}\nService Type: ${smppParsed.service_type || 'N/A'}\nDestination: ${smppParsed.destination_addr || 'N/A'}\nSource: ${smppParsed.source_addr || 'N/A'}` : rawText.substring(0, 1000)),
+    raw_hex: hexSnippet,
+    ai_explanation: isSip ? (sipParsed.ai_explanation || '') : (smppParsed?.ai_explanation || (protoName === 'RTP' ? `RTP Voice packet delivering real-time audio from ${srcIp} to ${dstIp}.` : `${protoName} frame transferred from ${srcIp} to ${dstIp}.`)),
+    ai_header_insights: isSip ? (sipParsed.ai_header_insights || []) : (smppParsed?.header_insights || []),
+    ai_body_insights: sipParsed.ai_body_insights || []
+  };
+
+  return { pktInfo, isSip, protoName, srcIp, dstIp, sipParsed, smppParsed, displayInfo, relTime };
+}
+
 export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string): Promise<PCAPAnalysisResult> {
   const dataView = new DataView(buffer);
   const totalBytes = buffer.byteLength;
@@ -448,6 +626,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   let lastTimestamp = 0;
 
   let isPcap = false;
+  let isPcapNg = false;
   let isLittleEndian = true;
 
   if (totalBytes >= 4) {
@@ -458,6 +637,12 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     } else if (magic === 0xd4c3b2a1 || magic === 0x4d3cb2a1) {
       isPcap = true;
       isLittleEndian = true;
+    } else if (magic === 0x0a0d0d0a) {
+      isPcapNg = true;
+      if (totalBytes >= 12) {
+        const bom = dataView.getUint32(8, false);
+        isLittleEndian = (bom === 0x4d3c2b1a || bom === 0x1a2b3c4d ? (bom === 0x4d3c2b1a) : true);
+      }
     }
   }
 
@@ -479,124 +664,13 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
       const pktTimestampSec = tsSec + tsUsec / 1000000;
       if (firstTimestamp === 0) firstTimestamp = pktTimestampSec;
       lastTimestamp = pktTimestampSec;
-      const relTime = pktTimestampSec - firstTimestamp;
 
-      // Extract raw bytes of this packet
       const pktBytes = new Uint8Array(buffer, offset, inclLen);
-      let srcIp = '10.70.26.74';
-      let dstIp = '10.88.29.6';
-      let protoName = 'UDP';
-      let sport = 5060;
-      let dport = 5060;
-      let payloadOffset = 0;
+      const { pktInfo, isSip, protoName, srcIp, dstIp, sipParsed, smppParsed, displayInfo, relTime } = dissectPacketPayload(
+        pktBytes, inclLen, globalLinkType, pktTimestampSec, tsSec, tsUsec, firstTimestamp, baseDate, pktIndex, textDecoder
+      );
 
-      // Determine Layer 2 Header Length (Ethernet vs Linux Cooked SLL v1 vs Raw IP)
-      let l2HeaderLen = 14;
-      let isIPv4 = false;
-
-      if (globalLinkType === 113 || (inclLen >= 16 && pktBytes[14] === 0x08 && pktBytes[15] === 0x00)) {
-        // Linux Cooked Capture v1 (SLL) - 16 bytes L2
-        l2HeaderLen = 16;
-        isIPv4 = (pktBytes[14] === 0x08 && pktBytes[15] === 0x00);
-      } else if (inclLen >= 14 && pktBytes[12] === 0x08 && pktBytes[13] === 0x00) {
-        // Standard Ethernet II - 14 bytes L2
-        l2HeaderLen = 14;
-        isIPv4 = true;
-      } else if (inclLen >= 20 && (pktBytes[0] >> 4) === 4) {
-        // Raw IPv4 - 0 bytes L2
-        l2HeaderLen = 0;
-        isIPv4 = true;
-      }
-
-      // Dissect IPv4 + Transport
-      if (isIPv4 && inclLen >= l2HeaderLen + 20) {
-        const ipProto = pktBytes[l2HeaderLen + 9];
-        srcIp = `${pktBytes[l2HeaderLen + 12]}.${pktBytes[l2HeaderLen + 13]}.${pktBytes[l2HeaderLen + 14]}.${pktBytes[l2HeaderLen + 15]}`;
-        dstIp = `${pktBytes[l2HeaderLen + 16]}.${pktBytes[l2HeaderLen + 17]}.${pktBytes[l2HeaderLen + 18]}.${pktBytes[l2HeaderLen + 19]}`;
-        const ipHeaderLen = (pktBytes[l2HeaderLen] & 0x0f) * 4;
-        const transportOffset = l2HeaderLen + ipHeaderLen;
-
-        if (ipProto === 17 && inclLen >= transportOffset + 8) { // UDP
-          sport = (pktBytes[transportOffset] << 8) | pktBytes[transportOffset + 1];
-          dport = (pktBytes[transportOffset + 2] << 8) | pktBytes[transportOffset + 3];
-          payloadOffset = transportOffset + 8;
-          
-          if (sport === 5060 || dport === 5060 || sport === 5070 || dport === 5070 || sport === 5080 || dport === 5080) {
-            protoName = 'SIP';
-          } else if (sport === 53 || dport === 53) {
-            protoName = 'DNS';
-          } else if (sport === 3868 || dport === 3868) {
-            protoName = 'DIAMETER';
-          } else if (payloadOffset < inclLen && (pktBytes[payloadOffset] & 0xc0) === 0x80 && (sport >= 8000 || dport >= 8000)) {
-            protoName = 'RTP';
-          } else {
-            protoName = 'UDP';
-          }
-        } else if (ipProto === 6 && inclLen >= transportOffset + 20) { // TCP
-          sport = (pktBytes[transportOffset] << 8) | pktBytes[transportOffset + 1];
-          dport = (pktBytes[transportOffset + 2] << 8) | pktBytes[transportOffset + 3];
-          const tcpHeaderLen = ((pktBytes[transportOffset + 12] >> 4) & 0x0f) * 4;
-          payloadOffset = transportOffset + tcpHeaderLen;
-          
-          if (sport === 5060 || dport === 5060 || sport === 5070 || dport === 5070 || sport === 5080 || dport === 5080) {
-            protoName = 'SIP';
-          } else if (sport === 9000 || dport === 9000 || sport === 2775 || dport === 2775 || sport === 15171 || dport === 15171 || sport === 5016 || dport === 5016) {
-            protoName = 'SMPP';
-          } else if (payloadOffset + 16 <= inclLen) {
-            const candidateCmdId = ((pktBytes[payloadOffset + 4] << 24) | (pktBytes[payloadOffset + 5] << 16) | (pktBytes[payloadOffset + 6] << 8) | pktBytes[payloadOffset + 7]) >>> 0;
-            if (SMPP_COMMAND_NAMES[candidateCmdId]) {
-              protoName = 'SMPP';
-            } else {
-              protoName = 'TCP';
-            }
-          } else {
-            protoName = 'TCP';
-          }
-        } else if (ipProto === 132) { // SCTP
-          protoName = 'SCTP';
-          payloadOffset = transportOffset + 12;
-        } else if (ipProto === 50) { // ESP
-          protoName = 'ESP';
-          payloadOffset = transportOffset;
-        }
-      }
-
-      // Check text payload for SIP or VMAS
-      let rawText = '';
-      let hexSnippet = '';
-      for (let b = 0; b < Math.min(inclLen, 64); b++) {
-        hexSnippet += pktBytes[b].toString(16).padStart(2, '0') + ' ';
-      }
-      hexSnippet = hexSnippet.trim();
-
-      if (payloadOffset > 0 && payloadOffset < inclLen) {
-        try {
-          rawText = textDecoder.decode(pktBytes.subarray(payloadOffset));
-        } catch {
-          rawText = '';
-        }
-      } else {
-        try {
-          rawText = textDecoder.decode(pktBytes);
-        } catch {
-          rawText = '';
-        }
-      }
-
-      const { isSip, cleanText } = cleanSipString(rawText);
-      if (isSip) {
-        protoName = 'SIP';
-      }
-
-      const sipParsed: ReturnType<typeof parseSipHeaders> = isSip 
-        ? parseSipHeaders(cleanText, srcIp, dstIp) 
-        : { info: '' };
-
-      let smppParsed: SmppDissection | null = null;
-      if (protoName === 'SMPP') {
-        smppParsed = parseSmppPdu(pktBytes, payloadOffset, inclLen, srcIp, dstIp);
-      }
-
+      packets.push(pktInfo);
       protocolCounts[protoName] = (protocolCounts[protoName] || 0) + 1;
       if (sipParsed.response_code) {
         const codeLabel = `${sipParsed.response_code} ${sipParsed.info?.replace(`Status: ${sipParsed.response_code}`, '').trim() || ''}`.trim();
@@ -606,57 +680,11 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
         sipMethods[sipParsed.sip_method] = (sipMethods[sipParsed.sip_method] || 0) + 1;
       }
 
-      let displayInfo = isSip ? (sipParsed.info || 'SIP Message') : `${protoName} (${sport} → ${dport}) Len=${inclLen}`;
-      if (protoName === 'SMPP' && smppParsed) {
-        displayInfo = smppParsed.info;
-      } else if (protoName === 'RTP') {
-        const pt = payloadOffset < inclLen ? (pktBytes[payloadOffset + 1] & 0x7f) : 0;
-        const seq = payloadOffset + 3 < inclLen ? ((pktBytes[payloadOffset + 2] << 8) | pktBytes[payloadOffset + 3]) : 0;
-        displayInfo = `RTP Audio Stream PT=${pt} Seq=${seq} (${sport} → ${dport})`;
-      } else if (protoName === 'UDP' && (sport === 5060 || dport === 5060)) {
-        displayInfo = `UDP (5060 → 5060) Keepalive Len=${inclLen}`;
-      }
-
-      const pktInfo: PacketInfo = {
-        id: `pkt_${pktIndex}`,
-        index: pktIndex,
-        time: relTime,
-        timestamp_str: formatTimestamp(tsSec, tsUsec, baseDate),
-        source: srcIp,
-        destination: dstIp,
-        protocol: protoName,
-        length: inclLen,
-        info: displayInfo,
-        sip_method: sipParsed.sip_method,
-        response_code: sipParsed.response_code,
-        call_id: isSip ? sipParsed.call_id : (smppParsed ? `SMPP_Seq_${smppParsed.sequence_number}` : undefined),
-        from_header: isSip ? sipParsed.from_header : (smppParsed?.source_addr ? `<tel:${smppParsed.source_addr}>` : undefined),
-        to_header: isSip ? sipParsed.to_header : (smppParsed?.destination_addr ? `<tel:${smppParsed.destination_addr}>` : undefined),
-        via: sipParsed.via,
-        cseq: isSip ? sipParsed.cseq : (smppParsed ? `${smppParsed.sequence_number} ${smppParsed.command_name}` : undefined),
-        contact: sipParsed.contact,
-        user_agent: sipParsed.user_agent,
-        content_type: isSip ? sipParsed.content_type : (protoName === 'SMPP' ? 'application/octet-stream (SMPP PDU)' : undefined),
-        content_length: isSip ? sipParsed.content_length : String(inclLen - payloadOffset),
-        expires: sipParsed.expires,
-        authorization: sipParsed.authorization,
-        www_authenticate: sipParsed.www_authenticate,
-        body: sipParsed.body,
-        sdp: sipParsed.sdp,
-        raw_text: isSip ? cleanText : (smppParsed ? `[SMPP PDU: ${smppParsed.info}]\nCommand: ${smppParsed.command_name}\nStatus: ${smppParsed.status_name}\nSequence: ${smppParsed.sequence_number}\nService Type: ${smppParsed.service_type || 'N/A'}\nDestination: ${smppParsed.destination_addr || 'N/A'}\nSource: ${smppParsed.source_addr || 'N/A'}` : rawText.substring(0, 1000)),
-        raw_hex: hexSnippet,
-        ai_explanation: isSip ? (sipParsed.ai_explanation || '') : (smppParsed?.ai_explanation || (protoName === 'RTP' ? `RTP Voice packet delivering real-time audio from ${srcIp} to ${dstIp}.` : `${protoName} frame transferred from ${srcIp} to ${dstIp}.`)),
-        ai_header_insights: isSip ? (sipParsed.ai_header_insights || []) : (smppParsed?.header_insights || []),
-        ai_body_insights: sipParsed.ai_body_insights || []
-      };
-
-      packets.push(pktInfo);
-
       // Register conversational nodes
       if (!nodesMap.has(srcIp)) {
         let role = 'Network Node';
         if (protoName === 'SMPP') {
-          role = (sport === 15171 || (sport !== 9000 && dport === 9000)) ? 'VMAS (SMS Client)' : 'MCO / SMSC (SMPP Server)';
+          role = (sportIsVmas(pktInfo) || srcIp.includes('.50')) ? 'VMAS (SMS Client)' : 'MCO / SMSC (SMPP Server)';
         } else {
           role = srcIp.endsWith('.20') || srcIp.endsWith('.8') || srcIp.startsWith('10.154') ? 'UE / Client' : srcIp.includes('192.168.4') ? 'S-CSCF / Core' : 'P-CSCF / Edge';
         }
@@ -665,7 +693,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
       if (!nodesMap.has(dstIp)) {
         let role = 'Network Node';
         if (protoName === 'SMPP') {
-          role = (dport === 9000 || (dport !== 15171 && sport === 9000)) ? 'MCO / SMSC (SMPP Server)' : 'VMAS (SMS Client)';
+          role = (sportIsVmas(pktInfo) || srcIp.includes('.50')) ? 'MCO / SMSC (SMPP Server)' : 'VMAS (SMS Client)';
         } else {
           role = dstIp.endsWith('.1') || dstIp.startsWith('10.88') ? 'P-CSCF / Proxy' : dstIp.includes('192.168.181') ? 'HSS / AAA' : 'IMS Core';
         }
@@ -690,9 +718,95 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
 
       offset += inclLen;
       pktIndex++;
-      // Parse up to 200,000 packets smoothly in memory
       if (pktIndex > 200000) break;
     }
+  } else if (isPcapNg && totalBytes > 12) {
+    let offset = 0;
+    let pktIndex = 1;
+    const linkTypes: number[] = [1];
+
+    while (offset + 8 <= totalBytes) {
+      const blockType = dataView.getUint32(offset, isLittleEndian);
+      const blockTotalLen = dataView.getUint32(offset + 4, isLittleEndian);
+      if (blockTotalLen < 12 || offset + blockTotalLen > totalBytes) break;
+
+      if (blockType === 0x00000001) { // IDB
+        const linkType = dataView.getUint16(offset + 8, isLittleEndian);
+        linkTypes.push(linkType);
+      } else if (blockType === 0x00000006) { // EPB
+        const interfaceId = dataView.getUint32(offset + 8, isLittleEndian);
+        const tsHigh = dataView.getUint32(offset + 12, isLittleEndian);
+        const tsLow = dataView.getUint32(offset + 16, isLittleEndian);
+        const capLen = dataView.getUint32(offset + 20, isLittleEndian);
+
+        const tsUsecTotal = (tsHigh * 4294967296 + tsLow);
+        const pktTimestampSec = tsUsecTotal / 1000000;
+        if (firstTimestamp === 0) firstTimestamp = pktTimestampSec;
+        lastTimestamp = pktTimestampSec;
+
+        const packetDataOffset = offset + 28;
+        if (packetDataOffset + capLen <= offset + blockTotalLen) {
+          const pktBytes = new Uint8Array(buffer, packetDataOffset, capLen);
+          const ifLinkType = linkTypes[interfaceId] || linkTypes[0] || 1;
+          const { pktInfo, isSip, protoName, srcIp, dstIp, sipParsed, smppParsed, displayInfo, relTime } = dissectPacketPayload(
+            pktBytes, capLen, ifLinkType, pktTimestampSec, Math.floor(pktTimestampSec), tsUsecTotal % 1000000, firstTimestamp, baseDate, pktIndex, textDecoder
+          );
+
+          packets.push(pktInfo);
+          protocolCounts[protoName] = (protocolCounts[protoName] || 0) + 1;
+          if (sipParsed.response_code) {
+            const codeLabel = `${sipParsed.response_code} ${sipParsed.info?.replace(`Status: ${sipParsed.response_code}`, '').trim() || ''}`.trim();
+            responseCodes[codeLabel] = (responseCodes[codeLabel] || 0) + 1;
+          }
+          if (sipParsed.sip_method) {
+            sipMethods[sipParsed.sip_method] = (sipMethods[sipParsed.sip_method] || 0) + 1;
+          }
+
+          if (!nodesMap.has(srcIp)) {
+            let role = 'Network Node';
+            if (protoName === 'SMPP') {
+              role = (sportIsVmas(pktInfo) || srcIp.includes('.50')) ? 'VMAS (SMS Client)' : 'MCO / SMSC (SMPP Server)';
+            } else {
+              role = srcIp.endsWith('.20') || srcIp.endsWith('.8') || srcIp.startsWith('10.154') ? 'UE / Client' : srcIp.includes('192.168.4') ? 'S-CSCF / Core' : 'P-CSCF / Edge';
+            }
+            nodesMap.set(srcIp, { id: srcIp, name: role, ip: srcIp, role });
+          }
+          if (!nodesMap.has(dstIp)) {
+            let role = 'Network Node';
+            if (protoName === 'SMPP') {
+              role = (sportIsVmas(pktInfo) || srcIp.includes('.50')) ? 'MCO / SMSC (SMPP Server)' : 'VMAS (SMS Client)';
+            } else {
+              role = dstIp.endsWith('.1') || dstIp.startsWith('10.88') ? 'P-CSCF / Proxy' : dstIp.includes('192.168.181') ? 'HSS / AAA' : 'IMS Core';
+            }
+            nodesMap.set(dstIp, { id: dstIp, name: role, ip: dstIp, role });
+          }
+
+          if ((isSip || protoName === 'SMPP' || protoName === 'SCTP' || protoName === 'ESP' || protoName === 'DNS' || protoName === 'DIAMETER') && arrows.length < 3000) {
+            arrows.push({
+              id: `arr_${pktIndex}`,
+              packet_id: pktInfo.id,
+              timestamp: pktInfo.timestamp_str || '00:00:00.000',
+              from_node: nodesMap.get(srcIp)?.name || srcIp,
+              to_node: nodesMap.get(dstIp)?.name || dstIp,
+              from_ip: srcIp,
+              to_ip: dstIp,
+              label: displayInfo.replace('Request: ', '').replace('Status: ', ''),
+              is_error: Boolean(sipParsed.response_code && sipParsed.response_code >= 400 && sipParsed.response_code !== 401) || Boolean(smppParsed && smppParsed.command_status !== 0),
+              status_code: sipParsed.response_code || (smppParsed?.command_status ?? null),
+              latency_ms: Math.round(relTime * 1000)
+            });
+          }
+
+          pktIndex++;
+        }
+      }
+      offset += blockTotalLen;
+      if (pktIndex > 200000) break;
+    }
+  }
+
+  function sportIsVmas(p: PacketInfo): boolean {
+    return (p.info?.includes('Submit_sm - Service') || p.source?.includes('.50'));
   }
 
   const durationSec = Math.max(0.05, lastTimestamp - firstTimestamp);
