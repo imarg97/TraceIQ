@@ -841,7 +841,7 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     issues.push({
       id: 'iss_vmas_missing_nfam_smpp',
       title: 'Missing NFAM SMS Notification Trigger (Only MCN Submit_sm Generated to MCO)',
-      severity: 'MEDIUM',
+      severity: 'CRITICAL',
       category: 'VMAS Notification Engine (MCN vs NFAM / SMPP)',
       affected_call_id: `SMPP Dialog #${mcnPkt.cseq || '7177'} (Recipient: ${recipient})`,
       description: `In the captured SMPP trace towards MCO (${mcnPkt.destination}), VMAS triggered an \`SMPP Submit_sm\` (Command: \`0x00000004\`, Service: \`MCN\`) for B-party subscriber \`${recipient}\`, and received \`Submit_sm_resp: Ok\`. However, **no corresponding NFAM (New Fax/Voice Alert Message) Submit_sm was triggered** towards MCO.`,
@@ -980,15 +980,19 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   }
 
   // Issue 5: ASBC Rx Interface AAA Timeout / PCRF Policy Rejection (CC_RX_SERVICE_FAILED / SIP 503)
-  const rxTimeoutPacket = packets.find(p => {
-    const txt = (p.raw_text || '' + p.info || '').toLowerCase();
-    return txt.includes('wait offer aaa timeout') || 
-           txt.includes('cc_rx_service_failed') || 
-           txt.includes('rx_service_failed') ||
-           (txt.includes('aaa timeout') && (txt.includes('503') || txt.includes('diameter')));
-  });
+  // ONLY for genuine ASBC captures or explicit SIP 503 CC_RX_SERVICE_FAILED packets
+  const isAsbcCapture = fileName.toLowerCase().includes('asbc') || fileName.toLowerCase().includes('tobe') || fileName.toLowerCase().includes('pcrf') || fileName.toLowerCase().includes('diameter');
+  const rxTimeoutPacket = (!isVmasTrace && !packets.some(p => p.protocol === 'SMPP') && (isAsbcCapture || Boolean(responseCodes['503 Service Unavailable'] || responseCodes['503'])))
+    ? packets.find(p => {
+        if (p.protocol !== 'SIP' && p.protocol !== 'DIAMETER') return false;
+        const txt = ((p.raw_text || '') + ' ' + (p.info || '')).toLowerCase();
+        return txt.includes('wait offer aaa timeout') || 
+               txt.includes('cc_rx_service_failed') || 
+               (txt.includes('aaa timeout') && (txt.includes('503') || txt.includes('diameter')));
+      })
+    : undefined;
 
-  const hasGeneric503 = (responseCodes['503 Service Unavailable'] || responseCodes['503']) && !packets.some(p => p.protocol === 'SMPP');
+  const hasGeneric503 = !isVmasTrace && !packets.some(p => p.protocol === 'SMPP') && Boolean(responseCodes['503 Service Unavailable'] || responseCodes['503']);
 
   if (rxTimeoutPacket) {
     issues.push({

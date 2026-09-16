@@ -112,7 +112,11 @@ export const AICopilotView: React.FC = () => {
       }
     } else if (currentPcap?.issues && currentPcap.issues.length > 0) {
       for (const issue of currentPcap.issues.slice(0, 2)) {
-        if (issue.title.toLowerCase().includes('dtmf')) {
+        if (issue.id === 'iss_vmas_missing_nfam_smpp' || issue.title.toLowerCase().includes('nfam') || issue.title.toLowerCase().includes('mcn')) {
+          prompts.push("Why was NFAM Submit_sm not triggered to MCO?");
+          prompts.push("Explain subscriber COS 0_01 MCN vs NFAM provisioning");
+          prompts.push("How does minimum voice recording duration threshold work?");
+        } else if (issue.title.toLowerCase().includes('dtmf')) {
           prompts.push("Are there any DTMF digit collection or transport issues?");
         } else if (issue.title.toLowerCase().includes('rx') || issue.title.toLowerCase().includes('aaa')) {
           prompts.push("What caused the Diameter Rx policy AAA timeout?");
@@ -124,11 +128,13 @@ export const AICopilotView: React.FC = () => {
       }
     }
 
-    if (!prompts.some(p => p.toLowerCase().includes('dtmf'))) {
+    if (!prompts.some(p => p.toLowerCase().includes('dtmf')) && !currentPcap?.issues?.some(i => i.id?.includes('smpp'))) {
       prompts.push("Are there any DTMF issues seen in this session?");
     }
-    prompts.push("How does the silence detection timer work?");
-    prompts.push("Explain SIP 481 Call Leg Does Not Exist error");
+    if (!currentPcap?.issues?.some(i => i.id?.includes('smpp'))) {
+      prompts.push("How does the silence detection timer work?");
+      prompts.push("Explain SIP 481 Call Leg Does Not Exist error");
+    }
 
     return Array.from(new Set(prompts)).slice(0, 5);
   }, [currentPcap, currentLog]);
