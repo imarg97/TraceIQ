@@ -1,4 +1,6 @@
 import { PCAPAnalysisResult, PacketInfo, CallFlowNode, CallFlowArrow, IssueEngineItem } from '../types';
+import { analyzeSessionStateMachine } from './dialogStateMachine';
+import { computeDiagnosticConfidence } from './diagnosticValidator';
 
 /**
  * Enhanced Client-Side Binary PCAP & PCAPNG Parser
@@ -1251,6 +1253,29 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     rcaRecommendations.push('Monitor periodic OPTIONS keepalive timings under peak traffic.');
   }
 
+  // 3GPP Dialog State Machine & Transaction Correlator (Phase 2 Engine)
+  const stateMachine = analyzeSessionStateMachine(packets);
+  if (stateMachine.detectedAnomalies.length > 0) {
+    for (const anomaly of stateMachine.detectedAnomalies) {
+      const alreadyExists = issues.some(i => i.title === anomaly.title || (anomaly.packetIndex && i.packet_indices?.includes(anomaly.packetIndex)));
+      if (!alreadyExists) {
+        issues.push({
+          id: `sm_${Math.random().toString(36).substring(2, 8)}`,
+          title: anomaly.title,
+          category: (anomaly.category as any) || 'PROTOCOL_ERROR',
+          severity: anomaly.severity,
+          timestamp: anomaly.timestamp || packets[0]?.timestamp_str || '00:00:00.000',
+          packet_indices: anomaly.packetIndex ? [anomaly.packetIndex] : [],
+          description: anomaly.detail,
+          root_cause: anomaly.rootCause,
+          recommendation: anomaly.remediation,
+          remediation: anomaly.remediation,
+          affected_nodes: anomaly.packetIndex ? [packets.find(p => p.index === anomaly.packetIndex)?.source || 'UE', packets.find(p => p.index === anomaly.packetIndex)?.destination || 'Core'] : ['Core']
+        });
+      }
+    }
+  }
+
   // Determine overall health score and failure state based on detected issues
   const hasCriticalFailure = issues.some(i => i.severity === 'CRITICAL');
   const hasHighFailure = issues.some(i => i.severity === 'HIGH');
@@ -1266,6 +1291,10 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
   }
 
   const isCallFailed = hasCriticalFailure || hasHighFailure || missingFilePacket || responseCodes['503'] || responseCodes['500'] || responseCodes['408'] || responseCodes['488'];
+
+  // Ground-Truth Confidence Calculation
+  const topIssue = issues.find(i => i.severity === 'CRITICAL') || issues.find(i => i.severity === 'HIGH') || issues[0];
+  const confidence = computeDiagnosticConfidence(packets, stateMachine, topIssue);
 
   return {
     file_name: fileName,
@@ -1289,14 +1318,14 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
     },
     issues,
     layman_info: {
-      what_this_is: 'Carrier Telecom Signaling Session',
+      what_this_is: `${stateMachine.serviceDescription || 'Carrier Telecom Signaling Session'}`,
       narrative: rcaPlainEnglish,
       verdict: rcaTitle,
       action_required: rcaRecommendations[0] || 'None required.'
     },
     ai_analysis: {
       executive_summary: `Analyzed \`${fileName}\` (${packets.length} packets). ${rcaPlainEnglish}`,
-      technical_summary: `Protocol dissection completed for ${packets.length} frames across ${durationSec.toFixed(2)}s. Evaluated SIP request/response transactions and application message bodies.`,
+      technical_summary: `Protocol dissection completed for ${packets.length} frames across ${durationSec.toFixed(2)}s. Classified service as ${stateMachine.serviceDescription}. Evaluated multi-leg SIP/SMPP/Diameter transactions with ${confidence.score}% verification confidence.`,
       root_cause: rcaVerdict,
       health_score: computedHealthScore,
       recommendations: rcaRecommendations,
@@ -1305,6 +1334,8 @@ export async function parsePcapArrayBuffer(buffer: ArrayBuffer, fileName: string
         `${packets[packets.length - 1]?.timestamp_str || '00:00:00.000'} - Transaction sequence finished.`
       ],
       plain_english: rcaPlainEnglish
-    }
+    },
+    state_machine: stateMachine,
+    confidence: confidence
   };
 }

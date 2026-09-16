@@ -71,6 +71,9 @@ export interface IssueEngineItem {
   remediation?: string;
   rfc_reference?: string;
   affected_call_id?: string;
+  packet_indices?: number[];
+  timestamp?: string;
+  affected_nodes?: string[];
 }
 
 export interface LaymanStoryInfo {
@@ -113,6 +116,13 @@ export interface PCAPAnalysisResult {
     customer_ready_brief?: string;
   };
   linked_logs?: LogAnalysisResult | null;
+  state_machine?: any;
+  confidence?: {
+    score: number;
+    confidenceLevel: string;
+    verificationBadges: string[];
+    methodology: string;
+  };
 }
 
 export interface LogEntry {
