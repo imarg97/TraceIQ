@@ -80,6 +80,36 @@ const BUILTIN_CARRIER_RULES: CarrierRCARule[] = [
       'Verify NFS shared mount status across all MRFP media cluster pods.'
     ],
     rfcStandardRef: 'RFC 5022 (MSML Media Server Control), RFC 4240'
+  },
+  {
+    id: 'rule_vmas_hcmn_smpp',
+    title: 'VMAS SMPP Delivery for MCN vs Consolidated HCMN (MCN_MULTIPLE / TON: 5 / NPI: 0)',
+    domain: 'VMAS_VAS',
+    triggerKeywords: ['hcmn', 'mcn_multiple', 'buzondevoz', 'source_addr_ton', 'source_addr_npi', 'vmassmppserviceparams', 'mcn vs hcmn', 'not for hcmn', 'for mcn it is sending correctly.. but not for hcmn'],
+    signaturePatterns: ['Service type: MCN', 'BuzonDeVoz', 'MCN_MULTIPLE', 'source_addr_ton>5'],
+    technicalVerdict: '⚠️ MCN Submit_sm succeeds with Alphanumeric Originator (TON: 5 / BuzonDeVoz), but Consolidated HCMN fails if SMSC rejects alphanumeric sender for aggregated batches or VMAS lacks dedicated <service_type>HCMN</service_type> profile.',
+    rootCause: '1. Service Type Profile Mismatch: VMAS defines <name>MCN_MULTIPLE</name> with <service_type>MCN</service_type> instead of <service_type>HCMN</service_type>, preventing the consolidated missed call event mapper from finding the active service profile.\n2. SMSC Alphanumeric Sender Rejection: MCN uses TON: 5 (Alphanumeric 0x05) with SENDERADDR: BuzonDeVoz. Some carrier SMSCs (e.g. Claro MCO) strictly require TON: 1 (International) or TON: 2 (National) with a numeric shortcode for aggregated/bulk notifications (HCMN).\n3. Enable_String_Month configuration mismatch in VMASSMPPServiceParams.',
+    resolutionSteps: [
+      'Add dedicated <VMASSMPPServiceParams> block in vmas_smpp.cfg with <name>HCMN</name> and <service_type>HCMN</service_type>.',
+      'Verify SMSC (MCO) capabilities for alphanumeric TON: 5 on bulk consolidated alerts vs numeric sender shortcodes.',
+      'Inspect VMAS smppMgr.alogc for Submit_sm rejection error codes (e.g. 0x0000000A ESME_RINVSRCADDR or 0x00000015 ESME_RINVSERTYP).'
+    ],
+    rfcStandardRef: 'SMPP v3.4 Protocol Specification / 3GPP TS 23.038 / Mavenir VMAS Architecture'
+  },
+  {
+    id: 'rule_vad_silence_timer',
+    title: 'Media Stream Trailing Silence & MSML Record Complete Guard Timer (final_silence_timeout)',
+    domain: 'VMAS_VAS',
+    triggerKeywords: ['silence at the end', 'silence at end', 'complained silence', 'customer complained silence', 'customer silence', 'trailing silence', 'silence audio', 'silence in audio', 'audio silence', 'silence at the end of audio'],
+    signaturePatterns: ['termcode=finalsilence', 'app.recordcomplete', 'BYE sip:msml', 'final_silence_timeout'],
+    technicalVerdict: 'ℹ️ Trailing silence in voicemail deposit is caused by the MRFP Voice Activity Detection (VAD) silence watchdog (3000ms–5000ms) waiting to confirm caller disconnect before terminating the recording and sending SIP BYE.',
+    rootCause: 'When the caller finishes speaking, the MRFP energy detector measures energy below -40 dBm and waits for post_speech_silence_timer (3000ms) to expire before declaring speech complete. Because this 3-second guard buffer is committed to the WAV file, the recipient hears 3 seconds of silence at the end of the recording.',
+    resolutionSteps: [
+      'Enable audio silence trimming in VMAS MRFP configuration (trim_trailing_silence = true) so the 3000ms silence buffer is automatically stripped from the saved .wav file.',
+      'Tune post_speech_silence_timer / final_silence_timeout from 3000ms down to 1500ms in vmas_ivr.cfg / msml_recording.xml.',
+      'Inspect SIP BYE frame timestamp to verify exact delay between audio energy drop and session release.'
+    ],
+    rfcStandardRef: 'RFC 5022 (MSML Media Server Control Section 6.2) / 3GPP TS 24.229'
   }
 ];
 
