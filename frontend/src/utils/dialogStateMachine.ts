@@ -81,8 +81,14 @@ export function analyzeSessionStateMachine(packets: PacketInfo[], fileName: stri
     if (p.protocol === 'GTP' || p.protocol === 'S1AP' || p.protocol === 'NGAP') hasGtp = true;
   }
 
-  // 2. Classify Primary Service
-  if (hasSmpp) {
+  // 2. Classify Primary Service (MRFP / Media sessions take precedence over auxiliary SMPP background traffic)
+  const isMrfpCapture = lowerName.includes('mrfp') || lowerName.includes('media') || lowerName.includes('audio') || 
+                        hasMsml || packets.some(p => p.protocol === 'RTP' || (p.raw_text || '').toLowerCase().includes('mrfp') || (p.info || '').toLowerCase().includes('msml'));
+
+  if (isMrfpCapture && (hasMsml || hasSip || packets.some(p => p.protocol === 'RTP'))) {
+    primaryService = 'VOICEMAIL_DEPOSIT';
+    serviceDescription = 'MRFP Media Server Session (Audio Recording & Trailing Silence Watchdog)';
+  } else if (hasSmpp) {
     const isMcn = packets.some(p => p.info?.includes('Service: MCN') || p.raw_text?.includes('MCN'));
     const isNfam = packets.some(p => p.info?.includes('Service: NFAM') || p.raw_text?.includes('NFAM'));
     if (isMcn && !isNfam) {
