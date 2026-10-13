@@ -97,6 +97,20 @@ CRITICAL OPERATIONAL RULES:
 4. VISUAL SEQUENCE DIAGRAM (FLOW): If the user asks to "draw the flow", "show sequence", or "visualize", output a clean Mermaid sequence diagram inside a \`\`\`mermaid code block.
 `;
 
+    const promptLower = (prompt || '').toLowerCase();
+    const isFlowQuery = 
+      promptLower.includes('flow') || 
+      promptLower.includes('sequence') || 
+      promptLower.includes('diagram') || 
+      promptLower.includes('ladder') || 
+      promptLower.includes('draw') || 
+      promptLower.includes('mermaid') || 
+      promptLower.includes('msc');
+
+    const flowInstruction = isFlowQuery
+      ? '\n\nCRITICAL REQUIREMENT: The user wants a VISUAL call flow sequence diagram. You MUST output a complete, valid ```mermaid sequenceDiagram ... ``` code block depicting chronological signaling interactions with participants and directional arrows citing exact frames.'
+      : '';
+
     // 2. Select AI Provider
     if (geminiKey) {
       // Google Gemini API (1.5 Flash / 2.0 Flash / Gemma via AI Studio)
@@ -109,7 +123,7 @@ CRITICAL OPERATIONAL RULES:
             role: 'user',
             parts: [
               {
-                text: `${systemPrompt}\n\n=== GENUINE PCAP CONTEXT ===\n${pcapManifest}\n\n=== APPLICATION LOG CONTEXT ===\n${logManifest}\n\n=== USER QUESTION ===\n${prompt}`,
+                text: `${systemPrompt}\n\n=== GENUINE PCAP CONTEXT ===\n${pcapManifest}\n\n=== APPLICATION LOG CONTEXT ===\n${logManifest}\n\n=== USER QUESTION ===\n${prompt}${flowInstruction}`,
               },
             ],
           },
@@ -135,12 +149,15 @@ CRITICAL OPERATIONAL RULES:
       }
 
       const geminiData = await geminiRes.json();
-      const answer = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
+      let answer = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
 
       if (answer) {
+        if (isFlowQuery && !answer.includes('```mermaid')) {
+          answer += `\n\n### 📊 Signaling Sequence Flow Diagram\n\n` + generateMermaidFromContext(pcapContext, logContext);
+        }
         return res.status(200).json({
           answer,
-          provider: `Google Gemini 1.5 Flash (Live Server Inference)`,
+          provider: `Google Gemini (${targetModel} - Live Server Inference)`,
           model: targetModel,
           tokens: geminiData?.usageMetadata?.totalTokenCount || null,
         });
@@ -192,4 +209,69 @@ CRITICAL OPERATIONAL RULES:
       error: 'Internal serverless AI error: ' + (err.message || String(err)),
     });
   }
+}
+
+function generateMermaidFromContext(pcapContext, logContext) {
+  const packets = pcapContext?.packets || [];
+  if (packets.length > 0) {
+    const signalingPackets = packets.filter((p) =>
+      p.protocol === 'SIP' ||
+      p.protocol === 'SMPP' ||
+      p.protocol === 'DIAMETER' ||
+      p.sip_method ||
+      (p.response_code && p.response_code >= 100) ||
+      (p.info && (p.info.includes('Submit_sm') || p.info.includes('BYE') || p.info.includes('INVITE') || p.info.includes('200')))
+    );
+    const targetPackets = (signalingPackets.length > 0 ? signalingPackets : packets).slice(0, 20);
+    const nodes = Array.from(new Set(targetPackets.flatMap((p) => [p.source, p.destination]).filter(Boolean))).slice(0, 5);
+
+    let m = '```mermaid\nsequenceDiagram\n  autonumber\n';
+    nodes.forEach((n, idx) => {
+      m += `  participant Node_${idx + 1} as ${n}\n`;
+    });
+    targetPackets.forEach((p) => {
+      const srcIdx = nodes.indexOf(p.source);
+      const dstIdx = nodes.indexOf(p.destination);
+      if (srcIdx >= 0 && dstIdx >= 0) {
+        const label = (p.sip_method || (p.response_code ? `SIP ${p.response_code}` : p.info || p.protocol || '')).replace(/[:#]/g, ' ').slice(0, 40);
+        const arrow = (p.response_code && p.response_code >= 400) ? '--x' : (p.response_code ? '-->>' : '->>');
+        m += `  Node_${srcIdx + 1}${arrow}Node_${dstIdx + 1}: [Frame #${p.index}] ${label}\n`;
+      }
+    });
+    m += '```\n';
+    return m;
+  }
+
+  if (logContext) {
+    const hasDbFault = (logContext.identified_faults || []).some((f) => f.id?.includes('db') || f.title?.includes('Database') || f.title?.includes('DBInsert'));
+    if (hasDbFault) {
+      return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant App as VMAS SCXML (MCN.scxml)
+  participant DBAdapter as DBAdapter Engine
+  participant Oracle as Oracle DBMS
+  App->>DBAdapter: Execute INSERT_MCA_RECORD
+  DBAdapter->>Oracle: SQL EXEC [INSERT INTO MCA_RECORDS]
+  Oracle--xDBAdapter: DBADAPTER_DBQUERY_RSP_ERR (Constraint / Lock / Table Space)
+  DBAdapter--xApp: EventName: DBInsert.Failed
+  Note over App: StartInsertMCACallInfoDBRetryTimer (5 min backoff)
+\`\`\``;
+    }
+  }
+
+  return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant Caller as Calling UE
+  participant SBC as SBC / P-CSCF
+  participant Core as IMS Core / S-CSCF
+  Caller->>SBC: SIP INVITE
+  SBC->>Core: SIP INVITE
+  Core-->>SBC: SIP 100 Trying
+  Core-->>SBC: SIP 180 Ringing
+  Core-->>SBC: SIP 200 OK
+  SBC-->>Caller: SIP 200 OK
+  Caller->>SBC: SIP ACK
+\`\`\``;
 }

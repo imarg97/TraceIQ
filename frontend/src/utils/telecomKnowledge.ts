@@ -58,14 +58,14 @@ export const DEFAULT_TELECOM_KNOWLEDGE_BASE: TelecomKnowledgeItem[] = [
   {
     id: 'kb_vmas_missing_prompt_p2228',
     category: 'VMS_VMAS',
-    title: 'SCXML Prompt Variable Missing in Dialog Flow (P2228.wav)',
-    signature_patterns: ['Expression Evaluation Failed', 'MrfAudioURI', 'P2228.wav', 'MrfAudioURI3'],
-    root_cause: 'The VMAS SCXML state machine evaluated prompt parameter $_event.MrfAudioURI3 as empty. The digits prompt (P2228.wav) was skipped during playback in the password workflow.',
-    technical_verdict: '⚠️ SCXML dialplan configuration does not populate variable MrfAudioURI3 prior to invoking mrfPlayPrompt.msml.',
-    sugarcoated_summary: 'The system encountered an unconfigured prompt token in the password menu sequence and seamlessly proceeded to the next step.',
+    title: 'SCXML Prompt Variable Missing in Dialog Flow',
+    signature_patterns: ['Expression Evaluation Failed', 'MrfAudioURI', 'MrfAudioURI3'],
+    root_cause: 'The VMAS SCXML state machine evaluated a prompt parameter (e.g. $_event.MrfAudioURI) as empty. The guidance prompt was skipped during playback in the dialog workflow.',
+    technical_verdict: '⚠️ SCXML dialplan configuration does not populate prompt variable prior to invoking mrfPlayPrompt.msml.',
+    sugarcoated_summary: 'The system encountered an unconfigured prompt token in the menu sequence and seamlessly proceeded to the next step.',
     resolution_steps: [
-      'Edit /opt/vmas/config/scxml/password_flow.xml and map file://mavpromptsClaroCol/voice/Spanish/P2228.wav to $audiouri3.',
-      'Verify audio asset exists on MRFP storage under /var/vmas/prompts/Spanish/P2228.wav with 644 read permissions.'
+      'Edit the application SCXML flow configuration and ensure audio prompt variables are mapped to valid prompt assets.',
+      'Verify audio asset files exist on the MRFP / media storage path with valid 644 read permissions.'
     ],
     rfc_3gpp_ref: 'W3C SCXML (State Chart XML), RFC 5022 (MSML)'
   },

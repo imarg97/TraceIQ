@@ -68,6 +68,116 @@ export async function uploadLogFile(file: File): Promise<LogAnalysisResult> {
   return await parseLogFile(file);
 }
 
+export function buildSynthesizedMermaid(pcapContext: any, logContext?: any): string {
+  const packets: any[] = pcapContext?.packets || [];
+
+  // 1. PCAP-Based Sequence Diagram
+  if (packets.length > 0) {
+    const signalingPackets = packets.filter((p: any) => 
+      p.protocol === 'SIP' || 
+      p.protocol === 'SMPP' || 
+      p.protocol === 'DIAMETER' || 
+      p.protocol === 'ISUP' || 
+      p.protocol === 'HTTP' || 
+      p.sip_method || 
+      (p.response_code && p.response_code >= 100) ||
+      (p.info && (p.info.includes('Submit_sm') || p.info.includes('BYE') || p.info.includes('INVITE') || p.info.includes('200')))
+    );
+
+    const targetPackets = (signalingPackets.length > 0 ? signalingPackets : packets).slice(0, 20);
+    const nodes = Array.from(new Set(targetPackets.flatMap((p: any) => [p.source, p.destination]).filter(Boolean))) as string[];
+    const topNodes = nodes.slice(0, 5);
+
+    let mermaid = '```mermaid\nsequenceDiagram\n  autonumber\n';
+    topNodes.forEach((n, idx) => {
+      const alias = `Node_${idx + 1}`;
+      const label = n.includes(':') ? n : (n.length > 20 ? n.slice(0, 18) + '...' : n);
+      mermaid += `  participant ${alias} as ${label}\n`;
+    });
+
+    targetPackets.forEach((p: any) => {
+      const srcIdx = topNodes.indexOf(p.source);
+      const dstIdx = topNodes.indexOf(p.destination);
+      if (srcIdx >= 0 && dstIdx >= 0) {
+        const label = p.sip_method || (p.response_code ? `SIP ${p.response_code}` : p.info || p.protocol || '');
+        const arrow = (p.response_code && p.response_code >= 400) ? '--x' : (p.response_code ? '-->>' : '->>');
+        const cleanLabel = (label || '').replace(/[:#]/g, ' ').slice(0, 40);
+        mermaid += `  Node_${srcIdx + 1}${arrow}Node_${dstIdx + 1}: [Frame #${p.index}] ${cleanLabel}\n`;
+      }
+    });
+
+    mermaid += '```\n';
+    return mermaid;
+  }
+
+  // 2. Log-Based Sequence Diagram (Component Interactions)
+  if (logContext) {
+    const hasDbFault = (logContext.identified_faults || []).some((f: any) => f.id?.includes('db') || f.title?.includes('Database') || f.title?.includes('DBInsert'));
+    const hasPromptFault = (logContext.identified_faults || []).some((f: any) => f.id?.includes('prompt') || f.title?.includes('Prompt'));
+
+    if (hasDbFault) {
+      return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant App as VMAS SCXML (MCN.scxml)
+  participant DBAdapter as DBAdapter Engine
+  participant Oracle as Oracle DBMS
+  participant SMSC as SMPP / SMSC Gateway
+  App->>DBAdapter: Execute INSERT_MCA_RECORD
+  DBAdapter->>Oracle: SQL EXEC [INSERT INTO MCA_RECORDS]
+  Oracle--xDBAdapter: DBADAPTER_DBQUERY_RSP_ERR (Constraint / Deadlock)
+  DBAdapter--xApp: EventName: DBInsert.Failed
+  Note over App: StartInsertMCACallInfoDBRetryTimer (5 min backoff)
+  App->>App: Enter Reschedule Transition Loop
+\`\`\``;
+    }
+
+    if (hasPromptFault) {
+      return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant Caller as Calling Subscriber
+  participant SCXML as VMAS SCXML Dialog Engine
+  participant MRFP as MRFP Media Server
+  Caller->>SCXML: Call Connected (Greeting Phase)
+  SCXML->>MRFP: mrfPlayPrompt (Audio guidance request)
+  MRFP-->>Caller: Play Audio Guidance
+  Note over SCXML: Expression Evaluation Failed (Parameter Empty)
+  SCXML--xMRFP: Skipped Unmapped Audio Prompt
+  SCXML->>Caller: Proceed to Next Workflow State
+\`\`\``;
+    }
+
+    return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant Client as Ingress Gateway / Client
+  participant Service as ${logContext.file_name || 'Application Core'}
+  participant Storage as Storage & Backing Services
+  Client->>Service: Ingress Request Transaction
+  Service->>Storage: State Sync & Data Persistence
+  Storage--xService: Backend Transaction Fault (${logContext.error_count || 1} errors detected)
+  Service-->>Client: Error Response / Automated Fallback
+\`\`\``;
+  }
+
+  // 3. Fallback Generic Signaling Diagram
+  return `\`\`\`mermaid
+sequenceDiagram
+  autonumber
+  participant Caller as Calling UE
+  participant SBC as SBC / P-CSCF
+  participant Core as IMS Core / S-CSCF
+  Caller->>SBC: SIP INVITE
+  SBC->>Core: SIP INVITE
+  Core-->>SBC: SIP 100 Trying
+  Core-->>SBC: SIP 180 Ringing
+  Core-->>SBC: SIP 200 OK
+  SBC-->>Caller: SIP 200 OK
+  Caller->>SBC: SIP ACK
+\`\`\``;
+}
+
 export async function askTelecomAI(prompt: string, pcapContext: any, logContext?: any): Promise<{ answer: string; provider: string }> {
   // Extract discovered SIP dialogs and caller IDs across the capture
   const packets: any[] = pcapContext?.packets || [];
@@ -87,6 +197,16 @@ export async function askTelecomAI(prompt: string, pcapContext: any, logContext?
       });
     }
   }
+
+  const queryLower = prompt.toLowerCase();
+  const isFlowQuery = 
+    queryLower.includes('flow') || 
+    queryLower.includes('sequence') || 
+    queryLower.includes('diagram') || 
+    queryLower.includes('ladder') || 
+    queryLower.includes('draw') || 
+    queryLower.includes('mermaid') || 
+    queryLower.includes('msc');
 
   const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_GEMINI_API_KEY') : null;
   const selectedModel = typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_SELECTED_MODEL') || 'gemini-1.5-flash' : 'gemini-1.5-flash';
@@ -111,8 +231,12 @@ export async function askTelecomAI(prompt: string, pcapContext: any, logContext?
     if (res.ok) {
       const data = await res.json();
       if (data.answer && !data.needsKey) {
+        let answer = data.answer;
+        if (isFlowQuery && !answer.includes('```mermaid')) {
+          answer += `\n\n### 📊 Signaling Sequence Flow Diagram\n\n` + buildSynthesizedMermaid(pcapContext, logContext);
+        }
         return {
-          answer: data.answer,
+          answer,
           provider: data.provider || `TraceIQ Neural Core (${selectedModel})`
         };
       }
@@ -163,8 +287,11 @@ Cite specific Frame # indices for all claims. When asked to "draw the flow", gen
 
       if (res.ok) {
         const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        let text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) {
+          if (isFlowQuery && !text.includes('```mermaid')) {
+            text += `\n\n### 📊 Signaling Sequence Flow Diagram\n\n` + buildSynthesizedMermaid(pcapContext, logContext);
+          }
           return {
             answer: text,
             provider: `Google Gemini (${targetModel} - Direct Client)`
@@ -176,32 +303,12 @@ Cite specific Frame # indices for all claims. When asked to "draw the flow", gen
     }
   }
 
-  const queryLower = prompt.toLowerCase();
-
-  // 3. Dynamic Visual Sequence Flow Generator ("Draw the flow", "show call flow")
-  if (queryLower.includes('draw the flow') || queryLower.includes('draw flow') || queryLower.includes('sequence diagram') || queryLower.includes('show flow') || queryLower.includes('call flow diagram')) {
-    const criticalPackets = packets.slice(0, 15);
-    const nodes = Array.from(new Set(criticalPackets.flatMap(p => [p.source, p.destination]).filter(Boolean))) as string[];
-    
-    let mermaid = '```mermaid\nsequenceDiagram\n  autonumber\n';
-    nodes.slice(0, 5).forEach((n, idx) => {
-      const alias = `Node_${idx + 1}`;
-      mermaid += `  participant ${alias} as ${n}\n`;
-    });
-
-    criticalPackets.forEach(p => {
-      const srcIdx = nodes.indexOf(p.source);
-      const dstIdx = nodes.indexOf(p.destination);
-      if (srcIdx >= 0 && dstIdx >= 0 && srcIdx < 5 && dstIdx < 5) {
-        const label = p.sip_method || (p.response_code ? `SIP ${p.response_code}` : p.info || p.protocol);
-        const arrow = (p.response_code && p.response_code >= 400) ? '--x' : '->>';
-        mermaid += `  Node_${srcIdx + 1}${arrow}Node_${dstIdx + 1}: [Frame #${p.index}] ${label}\n`;
-      }
-    });
-    mermaid += '```\n';
-
+  // 3. Dynamic Visual Sequence Flow Generator ("Draw the call flow sequence", "Draw the call flow diagram", "show call flow")
+  if (isFlowQuery) {
+    const mermaid = buildSynthesizedMermaid(pcapContext, logContext);
+    const title = pcapContext?.file_name || logContext?.file_name || 'Active Session';
     return {
-      answer: `### 📊 Visual Signaling Sequence Flow: \`${pcapContext?.file_name || 'Active Capture'}\`\n\n**Total Analyzed Packets**: **${packets.length} frames** | **Discovered Network Nodes**: **${nodes.length} endpoints**\n\n${mermaid}\n\n💡 *Tip: Click on the **Call Flow Ladder** tab in the navigation bar to inspect this diagram in full interactive zoom with bidirectional packet inspection.*`,
+      answer: `### 📊 Visual Signaling Sequence Flow: \`${title}\`\n\n**Total Analyzed Session**: **${packets.length > 0 ? `${packets.length} frames` : `${logContext?.total_lines || 0} log lines`}**\n\n${mermaid}\n\n💡 *Tip: Click on the **Call Flow Ladder** tab in the navigation bar to inspect this diagram in full interactive zoom with bidirectional packet inspection.*`,
       provider: 'TraceIQ Sequence Synthesis Engine'
     };
   }

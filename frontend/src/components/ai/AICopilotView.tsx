@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { TeachRCAModal } from '../modals/TeachRCAModal';
 import { RCAMemoryStore } from '../../utils/rcaMemoryStore';
+import { MermaidSequenceViewer } from './MermaidSequenceViewer';
 
 interface ChatMessage {
   id: string;
@@ -46,12 +47,16 @@ function renderFormattedText(text: string) {
 
           const isMermaid = lang === 'mermaid' || codeBody.includes('sequenceDiagram');
 
+          if (isMermaid) {
+            return <MermaidSequenceViewer key={pIdx} code={codeBody} />;
+          }
+
           return (
             <div key={pIdx} className="my-2.5 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-md">
               <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-[11px] font-mono text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <Terminal className="w-3.5 h-3.5 text-ag-primary" />
-                  <span>{isMermaid ? 'Call Flow Sequence Chart' : (lang || 'signaling payload')}</span>
+                  <span>{lang || 'signaling payload'}</span>
                 </span>
                 <button
                   onClick={() => navigator.clipboard.writeText(codeBody)}
@@ -343,7 +348,7 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
   };
 
   return (
-    <div className="flex-1 flex flex-col p-4 md:p-6 gap-5 overflow-y-auto max-w-7xl mx-auto w-full font-sans min-h-full pb-16">
+    <div className="flex-1 w-full h-full flex flex-col p-3 md:p-4 gap-3 overflow-hidden font-sans">
       
       {/* Top Banner */}
       <div className="bg-white dark:bg-ag-darkCard p-5 rounded-2xl border border-slate-200 dark:border-ag-darkBorder flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs shrink-0">
@@ -407,17 +412,14 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
       </div>
 
       {/* Main 2-Column Split */}
-      <div ref={aiContainerRef} className="flex-1 flex flex-col lg:flex-row gap-2 items-stretch">
+      <div ref={aiContainerRef} className="flex-1 flex flex-col lg:flex-row gap-2 items-stretch min-h-0 overflow-hidden">
         
         {/* Left Column: Box 1 (Root Cause & Diagnostics + Customer Brief) */}
         <div 
           style={{ width: `${aiLeftWidth}%` }}
-          className="flex flex-col gap-4 min-w-[280px]"
+          className="flex flex-col min-w-[280px] h-full min-h-0 bg-white dark:bg-ag-darkCard rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs overflow-hidden"
         >
-          <div className="bg-white dark:bg-ag-darkCard p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-4">
-            
-            {/* Header with View Toggle (Engineering vs Customer-Ready) */}
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 pb-3">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-ag-darkBorder/40 px-4 py-3 shrink-0 bg-slate-50/50 dark:bg-ag-darkSurface/30">
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-ag-darkSurface p-1 rounded-xl border border-slate-200 dark:border-ag-darkBorder">
                 <button
                   onClick={() => setViewMode('ENGINEERING')}
@@ -455,7 +457,8 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
               )}
             </div>
 
-            {/* View Mode Content */}
+            {/* Scrollable Diagnostics Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 min-h-0">
             {viewMode === 'CUSTOMER_READY' ? (
               <div className="space-y-3">
                 <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/40 space-y-2 text-xs text-slate-800 dark:text-slate-200 leading-relaxed font-sans select-text">
@@ -539,16 +542,16 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
         {/* Draggable Resizer Splitter Bar */}
         <div 
           onMouseDown={handleMouseDownAiSplitter}
-          className="hidden lg:flex w-2 bg-slate-100 dark:bg-black/60 hover:bg-ag-primary/40 cursor-col-resize flex-col items-center justify-center transition-colors mx-0.5 rounded"
+          className="hidden lg:flex w-2.5 hover:w-3 bg-slate-100 dark:bg-black/40 hover:bg-ag-primary/40 cursor-col-resize flex-col items-center justify-center transition-all mx-0.5 rounded shrink-0 select-none group"
           title="Drag left/right to resize Diagnosis vs Chat"
         >
-          <div className="h-12 w-1 rounded-full bg-slate-300 dark:bg-slate-700"></div>
+          <div className="h-12 w-1 rounded-full bg-slate-300 dark:bg-slate-700 group-hover:bg-ag-primary transition-colors"></div>
         </div>
 
         {/* Right Column: Live Interactive Chat */}
         <div 
-          style={{ width: `${Math.max(30, 100 - aiLeftWidth - 1)}%` }}
-          className="bg-white dark:bg-ag-darkCard rounded-2xl border border-slate-200 dark:border-ag-darkBorder flex flex-col shadow-xs overflow-hidden h-[660px] min-w-[320px]"
+          style={{ width: `${Math.max(25, 100 - aiLeftWidth - 0.8)}%` }}
+          className="bg-white dark:bg-ag-darkCard rounded-2xl border border-slate-200 dark:border-ag-darkBorder flex flex-col shadow-xs overflow-hidden h-full min-h-0 min-w-[320px]"
         >
           {/* Chat Messages Log */}
           <div className="flex-1 p-4 md:p-5 overflow-y-auto space-y-4 select-text">

@@ -49,6 +49,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
   let hasK8sError = false;
   let hasLicenseFailure = false;
   let hasOutOfMemory = false;
+  let detectedMissingUriVar = '';
 
   // Step 1: Parse Line by Line (High-Performance Single Pass)
   for (let i = 0; i < lines.length; i++) {
@@ -192,17 +193,22 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       };
     }
 
-    // Fault Signature 1: VMAS Missing Prompt / Expression Evaluation Failed (e.g. P2228.wav)
+    // Fault Signature 1: VMAS Missing Prompt / Expression Evaluation Failed (e.g. MrfAudioURI)
     else if (line.includes('Expression Evaluation Failed') && line.includes('MrfAudioURI')) {
       isFault = true;
       level = 'ERROR';
       errorCount++;
       hasMissingPrompt = true;
+      const uriMatch = line.match(/(MrfAudioURI\w*)/i);
+      if (uriMatch && !detectedMissingUriVar) {
+        detectedMissingUriVar = uriMatch[1];
+      }
+      const varName = detectedMissingUriVar || 'MrfAudioURI';
       faultDetails = {
-        title: 'SCXML Prompt Variable Missing in Dialog Flow',
-        root_cause: `The VMAS state machine evaluated a prompt parameter (e.g. \`$_event.MrfAudioURI3\`) as empty. A prompt defined in the dialplan (e.g. P2228.wav digits prompt) was skipped during playback.`,
-        solution: 'Bind prompt P2228.wav to the MSML template parameters in the SCXML password workflow.',
-        sugarcoated_summary: 'The system encountered an unconfigured prompt token in the password menu sequence and seamlessly proceeded to the next step.'
+        title: `SCXML Prompt Variable Missing in Dialog Flow (${varName})`,
+        root_cause: `The state machine evaluated prompt parameter \`$_event.${varName}\` as empty. The prompt defined in the dialplan was skipped during playback.`,
+        solution: `Bind the audio prompt URI to parameter \`${varName}\` in the SCXML workflow XML template.`,
+        sugarcoated_summary: 'The system encountered an unconfigured prompt parameter in the menu sequence and proceeded to the next step.'
       };
     }
 
@@ -326,15 +332,16 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
   }
 
   if (hasMissingPrompt) {
+    const varName = detectedMissingUriVar || 'MrfAudioURI';
     identifiedFaults.push({
       id: 'flt_vmas_missing_prompt',
-      title: 'Prompt Variable Not Bound in SCXML Template (P2228.wav)',
+      title: `Prompt Parameter Variable Unbound in SCXML Template ($${varName})`,
       severity: 'HIGH',
       category: 'Voicemail Application Server',
-      description: 'The SCXML state machine evaluated `$_event.MrfAudioURI3` as empty. The digits prompt (P2228) was omitted during the password authentication playback cycle.',
-      possible_cause: 'Dialplan XML / SCXML configuration does not populate variable MrfAudioURI3 before invoking mrfPlayPrompt.msml.',
-      recommendation: 'Update the VMAS SCXML template mapping to assign `file://mavpromptsClaroCol/voice/Spanish/P2228.wav` to `$audiouri3`.',
-      remediation: 'Edit `/opt/vmas/config/scxml/password_flow.xml` and add `<assign location="MrfAudioURI3" expr="\'file://mavpromptsClaroCol/voice/Spanish/P2228.wav\'"/>`.'
+      description: `The SCXML state machine evaluated prompt parameter \`$_event.${varName}\` as unassigned or empty. The required audio guidance prompt was skipped during playback.`,
+      possible_cause: `Dialplan XML or SCXML state machine configuration does not assign variable ${varName} before invoking mrfPlayPrompt.msml.`,
+      recommendation: `Update the SCXML template variable assignments to ensure $${varName.toLowerCase()} is mapped before media playback.`,
+      remediation: `Verify dialplan routing and prompt table configuration in /opt/vmas/config/scxml/ for variable ${varName}.`
     });
   }
 
