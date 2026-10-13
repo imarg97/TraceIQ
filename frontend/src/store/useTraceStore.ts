@@ -105,6 +105,7 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
       const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
       set({ 
         currentPcap: data, 
+        currentLog: data.linked_logs || null,
         recentPcaps: [data, ...prevRecent].slice(0, 8),
         selectedPacket: data.packets ? data.packets[0] : null, 
         isLoading: false 
@@ -148,6 +149,7 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
 
       set({
         currentLog: logData,
+        currentPcap: null,
         recentLogs: [logData, ...prevLogs].slice(0, 8),
         activeTab: 'logs',
         isLoading: false
@@ -175,8 +177,8 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
       }
 
       set({
-        currentPcap: pcapData || get().currentPcap,
-        currentLog: logData || get().currentLog,
+        currentPcap: pcapData,
+        currentLog: logData || (pcapData ? (pcapData.linked_logs || null) : null),
         activeTab: pcapData ? 'dashboard' : 'logs',
         isLoading: false
       });
@@ -188,6 +190,7 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   switchPcap: (pcap: PCAPAnalysisResult) => {
     set({
       currentPcap: pcap,
+      currentLog: pcap.linked_logs || null,
       selectedPacket: pcap.packets ? pcap.packets[0] : null,
       searchFilter: '',
       protocolFilter: 'ALL',
@@ -199,6 +202,7 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   switchLog: (log: LogAnalysisResult) => {
     set({
       currentLog: log,
+      currentPcap: null,
       activeTab: 'logs',
       error: null
     });

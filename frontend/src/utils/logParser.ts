@@ -125,7 +125,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
       }
     }
 
-    if (phoneNumbersSet.size < 50 && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart') || line.includes('TelephoneNumber'))) {
+    if (phoneNumbersSet.size < 50 && (line.includes('sip:+') || line.includes('tel:+') || line.includes('cldpn') || line.includes('Clngpn') || line.includes('UserPart') || line.includes('TelephoneNumber') || line.includes('MSISDN') || line.includes('msisdn') || line.includes('Calling') || line.includes('Called'))) {
       const phoneMatch = line.match(PHONE_REGEX);
       if (phoneMatch) {
         msisdn = phoneMatch[0];
@@ -160,6 +160,24 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Detect Faults & Root Causes
     let faultDetails: LogEntry['fault_details'] | undefined;
 
+    // Helper to promote entry level without double-counting
+    const promoteToError = (critical = false) => {
+      if (level !== 'ERROR' && level !== 'CRITICAL') {
+        if (level === 'INFO') infoCount = Math.max(0, infoCount - 1);
+        else if (level === 'WARN') warnCount = Math.max(0, warnCount - 1);
+        errorCount++;
+      }
+      level = critical ? 'CRITICAL' : (level === 'CRITICAL' ? 'CRITICAL' : 'ERROR');
+    };
+
+    const promoteToWarn = () => {
+      if (level !== 'ERROR' && level !== 'CRITICAL' && level !== 'WARN') {
+        if (level === 'INFO') infoCount = Math.max(0, infoCount - 1);
+        warnCount++;
+        level = 'WARN';
+      }
+    };
+
     // Fault Signature A: Database Insert / Adapter Failure (e.g., DBInsert.Failed, DBADAPTER_DBQUERY_RSP_ERR, INSERT_MCA_RECORD failed)
     if (line.includes('DBInsert.Failed') || 
         line.includes('DBADAPTER_DBQUERY_RSP_ERR') || 
@@ -168,8 +186,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
         line.includes('StartInsertMCACallInfoDBRetryTimer') ||
         line.includes('SendFailureEvent') && line.includes('InsertMCARecord')) {
       isFault = true;
-      level = 'ERROR';
-      errorCount++;
+      promoteToError();
       hasDbInsertFailed = true;
       hasMcnFailure = true;
       faultDetails = {
@@ -183,7 +200,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature B: MCN / State Machine Transitions into Failure
     else if (line.includes('MCN.scxml') && (line.includes('Fail') || line.includes('Retry') || line.includes('Error'))) {
       isFault = true;
-      if (level !== 'ERROR') { level = 'WARN'; warnCount++; }
+      promoteToWarn();
       hasMcnFailure = true;
       faultDetails = {
         title: 'MCN / Missed Call Notification State Machine Failure',
@@ -196,8 +213,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 1: VMAS Missing Prompt / Expression Evaluation Failed (e.g. MrfAudioURI)
     else if (line.includes('Expression Evaluation Failed') && line.includes('MrfAudioURI')) {
       isFault = true;
-      level = 'ERROR';
-      errorCount++;
+      promoteToError();
       hasMissingPrompt = true;
       const uriMatch = line.match(/(MrfAudioURI\w*)/i);
       if (uriMatch && !detectedMissingUriVar) {
@@ -215,7 +231,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 2: 481 Call Leg Does Not Exist / Early Teardown
     else if (line.includes('RspCode:481') || line.includes('481 Call Leg') || (line.includes('sdf_ivk_uaUpdateCallDetails') && line.includes('Errorcode:2016'))) {
       isFault = true;
-      if (level !== 'ERROR') { level = 'WARN'; warnCount++; }
+      promoteToWarn();
       hasEarlyTeardown = true;
       faultDetails = {
         title: 'SIP 481 Call Leg Does Not Exist (Premature Release)',
@@ -228,8 +244,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 3: Kubernetes VIP Allocation / Pod Spawning Failure (Strict matching)
     else if (line.includes('CrashLoopBackOff') || line.includes('FailedScheduling') || (line.toLowerCase().includes('keepalived') && line.toLowerCase().includes('failed'))) {
       isFault = true;
-      level = 'CRITICAL';
-      errorCount++;
+      promoteToError(true);
       hasK8sError = true;
       faultDetails = {
         title: 'Kubernetes Virtual IP (VIP) / Pod Scheduling Failure',
@@ -242,8 +257,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 4: Redis Cluster / Connection Pool Depletion
     else if (line.includes('READONLY You can\'t write') || line.includes('RedisConnectionException') || line.includes('Could not get a resource from the pool') || line.includes('WRONGTYPE Operation against a key')) {
       isFault = true;
-      level = 'ERROR';
-      errorCount++;
+      promoteToError();
       hasRedisError = true;
       faultDetails = {
         title: 'Redis Cluster Replication or Connection Pool Starvation',
@@ -256,8 +270,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 5: Diameter / OCS / Charging Timeouts
     else if (line.includes('DIAMETER_AUTHENTICATION_REJECTED') || line.includes('DIAMETER_AUTHORIZATION_REJECTED') || line.includes('DIAMETER_UNABLE_TO_DELIVER') || line.includes('CCA-I Timeout') || line.includes('CCR Timeout')) {
       isFault = true;
-      level = 'ERROR';
-      errorCount++;
+      promoteToError();
       hasDiameterTimeout = true;
       faultDetails = {
         title: 'Diameter Credit Control (Gy/Ro) Policy Rejection / Timeout',
@@ -270,8 +283,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 6: License Expiration / Threshold Limit
     else if (line.includes('License expired') || line.includes('LICENSE_CAPACITY_EXCEEDED') || line.includes('License limit reached')) {
       isFault = true;
-      level = 'CRITICAL';
-      errorCount++;
+      promoteToError(true);
       hasLicenseFailure = true;
       faultDetails = {
         title: 'Software License Expiration or Capacity Threshold Exceeded',
@@ -284,8 +296,7 @@ export function parseLogString(rawText: string, fileName: string, fileSizeBytes:
     // Fault Signature 7: Generic C++ Core Dump / Segmentation Fault / Null Pointer
     else if (line.includes('Segmentation fault') || line.includes('NullPointerException') || line.includes('SIGSEGV') || line.includes('SIGABRT') || line.includes('pure virtual method called')) {
       isFault = true;
-      level = 'CRITICAL';
-      errorCount++;
+      promoteToError(true);
       faultDetails = {
         title: 'Application Process Crash / Core Dump (SIGSEGV / SIGABRT)',
         root_cause: 'Uncaught memory segmentation fault or null pointer dereference in application core binary.',

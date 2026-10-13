@@ -114,18 +114,12 @@ const BUILTIN_CARRIER_RULES: CarrierRCARule[] = [
 ];
 
 const STORAGE_KEY = 'TRACEIQ_CUSTOM_RCA_KNOWLEDGE_V2';
+let memoryCustomRules: CarrierRCARule[] = [];
 
 export class RCAMemoryStore {
   public static getAllRules(): CarrierRCARule[] {
-    if (typeof window === 'undefined') return BUILTIN_CARRIER_RULES;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return BUILTIN_CARRIER_RULES;
-      const parsed: CarrierRCARule[] = JSON.parse(stored);
-      return [...parsed, ...BUILTIN_CARRIER_RULES.filter(b => !parsed.some(p => p.id === b.id))];
-    } catch {
-      return BUILTIN_CARRIER_RULES;
-    }
+    const custom = this.getCustomRules();
+    return [...custom, ...BUILTIN_CARRIER_RULES.filter(b => !custom.some(p => p.id === b.id))];
   }
 
   public static addRule(rule: Omit<CarrierRCARule, 'id' | 'createdAt' | 'userTaught'>): CarrierRCARule {
@@ -139,8 +133,14 @@ export class RCAMemoryStore {
 
     const current = this.getCustomRules();
     const updated = [newRule, ...current];
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {
+        memoryCustomRules = updated;
+      }
+    } else {
+      memoryCustomRules = updated;
     }
     return newRule;
   }
@@ -150,26 +150,41 @@ export class RCAMemoryStore {
   }
 
   public static resetToDefaults(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
     }
+    memoryCustomRules = [];
   }
 
   public static getCustomRules(): CarrierRCARule[] {
-    if (typeof window === 'undefined') return [];
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+      return memoryCustomRules;
+    }
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch {
-      return [];
+      return memoryCustomRules;
     }
   }
 
   public static deleteRule(ruleId: string): void {
     const current = this.getCustomRules().filter(r => r.id !== ruleId);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      } catch {
+        memoryCustomRules = current;
+      }
+    } else {
+      memoryCustomRules = current;
     }
+  }
+
+  public static matchRule(query: string, rawText: string = ''): CarrierRCARule | null {
+    return this.findMatchingRule(query, rawText);
   }
 
   public static findMatchingRule(query: string, rawText: string = ''): CarrierRCARule | null {
