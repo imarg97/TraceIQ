@@ -18,7 +18,8 @@ import {
   Wrench,
   Terminal,
   ThumbsUp,
-  Sliders
+  Sliders,
+  Cpu
 } from 'lucide-react';
 import { TeachRCAModal } from '../modals/TeachRCAModal';
 import { RCAMemoryStore } from '../../utils/rcaMemoryStore';
@@ -31,52 +32,91 @@ interface ChatMessage {
 }
 
 function renderFormattedText(text: string) {
-  const lines = text.split('\n');
+  // Check if text has code blocks delimited by ```
+  const parts = text.split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-1.5 leading-relaxed text-xs">
-      {lines.map((line, lIdx) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={lIdx} className="h-1" />;
+    <div className="space-y-2 leading-relaxed text-xs">
+      {parts.map((part, pIdx) => {
+        if (part.startsWith('```') && part.endsWith('```')) {
+          const content = part.slice(3, -3);
+          const firstLineBreak = content.indexOf('\n');
+          const lang = firstLineBreak > 0 ? content.slice(0, firstLineBreak).trim().toLowerCase() : '';
+          const codeBody = firstLineBreak > 0 ? content.slice(firstLineBreak + 1) : content;
 
-        // Header ###
-        if (trimmed.startsWith('### ')) {
-          return (
-            <h4 key={lIdx} className="font-heading font-bold text-xs text-ag-primary pt-1 pb-0.5 tracking-tight flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-ag-primary shrink-0" />
-              <span>{trimmed.replace('### ', '')}</span>
-            </h4>
-          );
-        }
+          const isMermaid = lang === 'mermaid' || codeBody.includes('sequenceDiagram');
 
-        // Bullet point
-        if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-          const content = trimmed.substring(2);
           return (
-            <div key={lIdx} className="flex items-start gap-2 pl-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-ag-primary mt-1.5 shrink-0" />
-              <span>{formatInlineMarkdown(content)}</span>
+            <div key={pIdx} className="my-2.5 rounded-xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-md">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-[11px] font-mono text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Terminal className="w-3.5 h-3.5 text-ag-primary" />
+                  <span>{isMermaid ? 'Call Flow Sequence Chart' : (lang || 'signaling payload')}</span>
+                </span>
+                <button
+                  onClick={() => navigator.clipboard.writeText(codeBody)}
+                  className="hover:text-ag-primary transition-colors flex items-center gap-1 text-[10px]"
+                  title="Copy code"
+                >
+                  <Copy className="w-3 h-3" />
+                  <span>Copy</span>
+                </button>
+              </div>
+              <pre className="p-3 text-[11px] font-mono text-slate-200 overflow-x-auto whitespace-pre leading-normal bg-slate-950/90">
+                {codeBody}
+              </pre>
             </div>
           );
         }
 
-        // Numbered list
-        const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
-        if (numMatch) {
-          return (
-            <div key={lIdx} className="flex items-start gap-2 pl-2">
-              <span className="font-mono font-bold text-ag-primary shrink-0 text-[11px]">{numMatch[1]}.</span>
-              <span>{formatInlineMarkdown(numMatch[2])}</span>
-            </div>
-          );
-        }
+        const lines = part.split('\n');
+        return (
+          <div key={pIdx} className="space-y-1.5">
+            {lines.map((line, lIdx) => {
+              const trimmed = line.trim();
+              if (!trimmed) return <div key={lIdx} className="h-1" />;
 
-        // Horizontal line
-        if (trimmed === '---' || trimmed === '***') {
-          return <div key={lIdx} className="border-t border-slate-200 dark:border-ag-darkBorder/40 my-2" />;
-        }
+              // Header ###
+              if (trimmed.startsWith('### ')) {
+                return (
+                  <h4 key={lIdx} className="font-heading font-bold text-xs text-ag-primary pt-1 pb-0.5 tracking-tight flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-ag-primary shrink-0" />
+                    <span>{trimmed.replace('### ', '')}</span>
+                  </h4>
+                );
+              }
 
-        return <p key={lIdx}>{formatInlineMarkdown(trimmed)}</p>;
+              // Bullet point
+              if (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                const content = trimmed.substring(2);
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 pl-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-ag-primary mt-1.5 shrink-0" />
+                    <span>{formatInlineMarkdown(content)}</span>
+                  </div>
+                );
+              }
+
+              // Numbered list
+              const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+              if (numMatch) {
+                return (
+                  <div key={lIdx} className="flex items-start gap-2 pl-2">
+                    <span className="font-mono font-bold text-ag-primary shrink-0 text-[11px]">{numMatch[1]}.</span>
+                    <span>{formatInlineMarkdown(numMatch[2])}</span>
+                  </div>
+                );
+              }
+
+              // Horizontal line
+              if (trimmed === '---' || trimmed === '***') {
+                return <div key={lIdx} className="border-t border-slate-200 dark:border-ag-darkBorder/40 my-2" />;
+              }
+
+              return <p key={lIdx}>{formatInlineMarkdown(trimmed)}</p>;
+            })}
+          </div>
+        );
       })}
     </div>
   );
@@ -86,6 +126,18 @@ export const AICopilotView: React.FC = () => {
   const { currentPcap, currentLog } = useTraceStore();
   const [viewMode, setViewMode] = useState<'ENGINEERING' | 'CUSTOMER_READY'>('ENGINEERING');
   const [copiedBrief, setCopiedBrief] = useState(false);
+
+  // Model Selection state
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    return (typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_SELECTED_MODEL') : null) || 'gemini-1.5-flash';
+  });
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('TRACEIQ_SELECTED_MODEL', model);
+    }
+  };
 
   // Gemini API Key state
   const [showKeyModal, setShowKeyModal] = useState(false);
@@ -104,42 +156,39 @@ export const AICopilotView: React.FC = () => {
 
   // Dynamic suggested inquiries based strictly on genuine session context
   const dynamicPrompts = useMemo(() => {
-    const prompts: string[] = ["What is the root cause of this failure?"];
+    const prompts: string[] = ["What is the root cause of this failure?", "Draw the call flow sequence"];
 
-    if (currentLog?.identified_faults && currentLog.identified_faults.length > 0) {
-      for (const fault of currentLog.identified_faults.slice(0, 2)) {
-        if (fault.title.toLowerCase().includes('database') || fault.title.toLowerCase().includes('mcn')) {
-          prompts.push("Explain the MCN database insert failure and retry loop");
-        } else if (fault.title.toLowerCase().includes('prompt') || fault.title.toLowerCase().includes('scxml')) {
-          prompts.push(`Why did ${fault.title} fail in the SCXML state machine?`);
-        } else {
-          prompts.push(`How do I resolve: ${fault.title}?`);
-        }
-      }
-    } else if (currentPcap?.issues && currentPcap.issues.length > 0) {
+    const packets = currentPcap?.packets || [];
+
+    // 1. Genuine Call-ID discovery
+    const discoveredCallIds = Array.from(new Set(packets.map(p => p.call_id).filter(Boolean))) as string[];
+    if (discoveredCallIds.length > 0) {
+      const topCallId = discoveredCallIds[0];
+      const shortId = topCallId.length > 18 ? `${topCallId.slice(0, 15)}...` : topCallId;
+      prompts.push(`Why did Call-ID ${shortId} terminate?`);
+    }
+
+    // 2. Genuine error packet inspection
+    const errPkt = packets.find(p => (p.response_code && p.response_code >= 400) || p.info?.toLowerCase().includes('reject') || p.info?.toLowerCase().includes('error'));
+    if (errPkt) {
+      prompts.push(`Explain Frame #${errPkt.index} (${errPkt.sip_method || errPkt.response_code || errPkt.info})`);
+    }
+
+    // 3. Pre-computed issues from this specific trace
+    if (currentPcap?.issues && currentPcap.issues.length > 0) {
       for (const issue of currentPcap.issues.slice(0, 2)) {
-        if (issue.id === 'iss_vmas_missing_nfam_smpp' || issue.title.toLowerCase().includes('nfam') || issue.title.toLowerCase().includes('mcn')) {
-          prompts.push("Why was NFAM Submit_sm not triggered to MCO?");
-          prompts.push("Explain subscriber COS 0_01 MCN vs NFAM provisioning");
-          prompts.push("How does minimum voice recording duration threshold work?");
-        } else if (issue.title.toLowerCase().includes('dtmf')) {
-          prompts.push("Are there any DTMF digit collection or transport issues?");
-        } else if (issue.title.toLowerCase().includes('rx') || issue.title.toLowerCase().includes('aaa')) {
-          prompts.push("What caused the Diameter Rx policy AAA timeout?");
-        } else if (issue.title.toLowerCase().includes('missing')) {
-          prompts.push(`How do I remediate ${issue.title}?`);
-        } else {
-          prompts.push(`Explain the signaling fault: ${issue.title}`);
+        if (issue.severity !== 'LOW') {
+          prompts.push(`How do I remediate: ${issue.title}?`);
         }
       }
     }
 
-    if (!prompts.some(p => p.toLowerCase().includes('dtmf')) && !currentPcap?.issues?.some(i => i.id?.includes('smpp'))) {
-      prompts.push("Are there any DTMF issues seen in this session?");
+    // 4. Genuine protocol checks
+    if (packets.some(p => p.protocol === 'RTP') && !prompts.some(p => p.includes('RTP'))) {
+      prompts.push("Analyze RTP media streams and audio codec negotiation");
     }
-    if (!currentPcap?.issues?.some(i => i.id?.includes('smpp'))) {
-      prompts.push("How does the silence detection timer work?");
-      prompts.push("Explain SIP 481 Call Leg Does Not Exist error");
+    if (packets.some(p => p.protocol === 'DIAMETER') && !prompts.some(p => p.includes('Diameter'))) {
+      prompts.push("Check Rx / Gx Diameter policy session authorization");
     }
 
     return Array.from(new Set(prompts)).slice(0, 5);
@@ -318,6 +367,22 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Neural Engine Selector */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-ag-darkBorder bg-slate-50 dark:bg-ag-darkSurface text-xs font-mono">
+            <Cpu className="w-3.5 h-3.5 text-ag-primary shrink-0" />
+            <select
+              value={selectedModel}
+              onChange={(e) => handleModelChange(e.target.value)}
+              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer text-xs"
+            >
+              <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (Cloud Neural)</option>
+              <option value="gemini-2.0-flash-exp">🚀 Gemini 2.0 Flash (Next-Gen Brain)</option>
+              <option value="gemma-2-27b">🧠 Gemma 2 (27B - Open Weights)</option>
+              <option value="qwen-2.5-72b">🌐 Qwen 2.5 (72B - Protocol Specialist)</option>
+              <option value="local-ollama">🔒 Local Telco Bridge (Ollama localhost)</option>
+            </select>
+          </div>
+
           <button
             onClick={() => setShowTeachModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-ag-darkBorder hover:border-ag-primary text-xs font-mono text-slate-700 dark:text-slate-300 hover:text-ag-primary transition-all bg-slate-50 dark:bg-ag-darkSurface"

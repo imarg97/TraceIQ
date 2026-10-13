@@ -88,52 +88,65 @@ export async function askTelecomAI(prompt: string, pcapContext: any, logContext?
     }
   }
 
-  // 1. Check for User-configured Google Gemini API Key
   const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_GEMINI_API_KEY') : null;
+  const selectedModel = typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_SELECTED_MODEL') || 'gemini-1.5-flash' : 'gemini-1.5-flash';
+
+  // 1. Primary Attempt: Call TraceIQ Serverless AI API (/api/chat) on Vercel
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(geminiKey ? { 'x-gemini-key': geminiKey } : {})
+      },
+      body: JSON.stringify({
+        prompt,
+        pcapContext,
+        logContext,
+        model: selectedModel,
+        customKey: geminiKey
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.answer && !data.needsKey) {
+        return {
+          answer: data.answer,
+          provider: data.provider || `TraceIQ Neural Core (${selectedModel})`
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[TraceIQ AI] Serverless /api/chat unreachable, evaluating direct API or client engine:', err);
+  }
+
+  // 2. Secondary Attempt: Direct Client-Side Gemini Call if user provided key in browser
   if (geminiKey) {
     try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+      const targetModel = selectedModel.includes('2.0') ? 'gemini-2.0-flash-exp' : (selectedModel.includes('gemma') ? 'gemini-1.5-flash' : 'gemini-1.5-flash');
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
       const pcapBrief = pcapContext ? `
 PCAP Capture File: ${pcapContext.file_name}
-Total Packets: ${pcapContext.packet_count}
-Duration: ${pcapContext.duration_sec}s
-Health Score: ${pcapContext.health_score}/100
-Primary Service (State Machine): ${pcapContext.state_machine?.serviceDescription || 'Carrier Telecom Session'}
-Diagnostic Confidence: ${pcapContext.confidence?.score || 98}% (${pcapContext.confidence?.confidenceLevel || 'VERY_HIGH'})
-State Machine Anomalies: ${JSON.stringify(pcapContext.state_machine?.detectedAnomalies || [])}
-Protocol Distribution: ${JSON.stringify(pcapContext.protocol_distribution)}
-Discovered Call/Caller-IDs: ${JSON.stringify(discoveredDialogs.slice(0, 10))}
+Total Packets: ${pcapContext.packet_count} | Duration: ${pcapContext.duration_sec}s | Health: ${pcapContext.health_score}/100
+Primary Service: ${pcapContext.state_machine?.serviceDescription || 'Carrier Telecom Session'}
 SIP Response Codes: ${JSON.stringify(pcapContext.sip_metrics?.response_codes || {})}
+Protocol Distribution: ${JSON.stringify(pcapContext.protocol_distribution)}
 Identified Nodes: ${JSON.stringify(pcapContext.call_flow?.nodes || [])}
-Detected Issues: ${JSON.stringify(pcapContext.issues || [])}
-First 20 Packets Summary: ${JSON.stringify(pcapContext.packets?.slice(0, 20).map((p: any) => ({ index: p.index, time: p.time, src: p.source, dst: p.destination, proto: p.protocol, info: p.info, from: p.from_header, to: p.to_header, call_id: p.call_id })) || [])}
+Pre-computed Anomaly Issues: ${JSON.stringify(pcapContext.issues || [])}
+Key Signaling Frames: ${JSON.stringify(pcapContext.packets?.filter((p: any) => (p.response_code && p.response_code >= 400) || p.sip_method === 'BYE' || p.sip_method === 'INVITE' || p.protocol === 'SMPP' || p.protocol === 'DIAMETER').slice(0, 30).map((p: any) => ({ index: p.index, time: p.time, src: p.source, dst: p.destination, proto: p.protocol, info: p.info, from: p.from_header, to: p.to_header, call_id: p.call_id })) || [])}
 ` : 'No PCAP capture loaded.';
 
       const logBrief = logContext ? `
-Log File: ${logContext.file_name}
-Log Type: ${logContext.log_type}
-Total Lines: ${logContext.total_lines}
-Errors: ${logContext.error_count}, Warnings: ${logContext.warn_count}
+Log File: ${logContext.file_name} (${logContext.log_type})
+Total Lines: ${logContext.total_lines} | Errors: ${logContext.error_count}
 Identified Log Faults: ${JSON.stringify(logContext.identified_faults || [])}
-Discovered Identifiers (Call-IDs, MSISDNs, Prompts, VIPs): ${JSON.stringify(logContext.discovered_identifiers || {})}
-Log Executive Summary: ${logContext.executive_summary}
-Log Root Cause: ${logContext.root_cause}
-Customer Ready Brief: ${logContext.customer_ready_brief}
-Action Plan: ${JSON.stringify(logContext.action_plan || [])}
-Sample Key Log Lines: ${JSON.stringify(logContext.entries?.filter((e: any) => e.is_fault || e.level === 'ERROR' || e.level === 'WARN').slice(0, 15).map((e: any) => ({ line: e.index, lvl: e.level, mod: e.module, msg: e.message })) || [])}
+Key Fault Lines: ${JSON.stringify(logContext.entries?.filter((e: any) => e.is_fault || e.level === 'ERROR').slice(0, 15).map((e: any) => ({ line: e.index, mod: e.module, msg: e.message })) || [])}
 ` : 'No Log file loaded.';
 
-      const systemPrompt = `You are TraceIQ Telecom & Cloud Infrastructure AI, an elite telecommunications protocol engineer, Kubernetes/OCP SRE, and application log diagnostician.
-You specialize in:
-1. 3GPP standards, VoLTE, VoNR, 5G Core, IMS, SIP (RFC 3261), SDP, RTP, VMAS (Voicemail as a Service), MSML XML dialogs, and audio prompt sequencing.
-2. Application C++ debug logs (e.g. Mavenir .alogc, SipUaMgr, ScxmlApp, DbAdapterServer).
-3. Cloud-Native & Deployment faults: Kubernetes/OCP Pod scheduling failures, Virtual IP (VIP) binding delays, MetalLB/Keepalived, CrashLoopBackOff.
-4. Database & Cache architectures: Redis cluster replication, connection pool starvation, Jedis timeouts.
-5. Management & Customer-Ready Reporting: Delivering both high-grade internal technical root causes AND diplomatic, sugarcoated customer-ready briefs.
-
-- When the user asks about the PCAP or logs (e.g. "What is the root cause?", "Why was P2228 skipped?", "How does the silence timer work?"), give a definitive, structured analysis.
-- When the user asks about general concepts (e.g. "What is RTP?", "Explain VIP in K8s", "How does Redis pool work?"), explain clearly with architecture, RFCs, and commands.
-- Format responses with clean bold text, bullet points, and code blocks.`;
+      const systemPrompt = `You are TraceIQ Telecom Neural Copilot, a principal telecommunications core architect and 3GPP protocol specialist.
+Ground your diagnosis STRICTLY on the real packet frames, Call-IDs, and IP endpoints in the PCAP context. Never invent packet numbers.
+Cite specific Frame # indices for all claims. When asked to "draw the flow", generate a valid Mermaid sequence diagram inside a \`\`\`mermaid code block.`;
 
       const res = await fetch(geminiUrl, {
         method: 'POST',
@@ -142,9 +155,7 @@ You specialize in:
           contents: [
             {
               role: 'user',
-              parts: [
-                { text: `${systemPrompt}\n\nPCAP Capture Context:\n${pcapBrief}\n\nApplication Log Context:\n${logBrief}\n\nUser Question:\n${prompt}` }
-              ]
+              parts: [{ text: `${systemPrompt}\n\nPCAP Context:\n${pcapBrief}\n\nLog Context:\n${logBrief}\n\nUser Question:\n${prompt}` }]
             }
           ]
         })
@@ -156,7 +167,7 @@ You specialize in:
         if (text) {
           return {
             answer: text,
-            provider: 'Google Gemini 1.5 Flash (Direct API)'
+            provider: `Google Gemini (${targetModel} - Direct Client)`
           };
         }
       }
@@ -166,6 +177,34 @@ You specialize in:
   }
 
   const queryLower = prompt.toLowerCase();
+
+  // 3. Dynamic Visual Sequence Flow Generator ("Draw the flow", "show call flow")
+  if (queryLower.includes('draw the flow') || queryLower.includes('draw flow') || queryLower.includes('sequence diagram') || queryLower.includes('show flow') || queryLower.includes('call flow diagram')) {
+    const criticalPackets = packets.slice(0, 15);
+    const nodes = Array.from(new Set(criticalPackets.flatMap(p => [p.source, p.destination]).filter(Boolean))) as string[];
+    
+    let mermaid = '```mermaid\nsequenceDiagram\n  autonumber\n';
+    nodes.slice(0, 5).forEach((n, idx) => {
+      const alias = `Node_${idx + 1}`;
+      mermaid += `  participant ${alias} as ${n}\n`;
+    });
+
+    criticalPackets.forEach(p => {
+      const srcIdx = nodes.indexOf(p.source);
+      const dstIdx = nodes.indexOf(p.destination);
+      if (srcIdx >= 0 && dstIdx >= 0 && srcIdx < 5 && dstIdx < 5) {
+        const label = p.sip_method || (p.response_code ? `SIP ${p.response_code}` : p.info || p.protocol);
+        const arrow = (p.response_code && p.response_code >= 400) ? '--x' : '->>';
+        mermaid += `  Node_${srcIdx + 1}${arrow}Node_${dstIdx + 1}: [Frame #${p.index}] ${label}\n`;
+      }
+    });
+    mermaid += '```\n';
+
+    return {
+      answer: `### 📊 Visual Signaling Sequence Flow: \`${pcapContext?.file_name || 'Active Capture'}\`\n\n**Total Analyzed Packets**: **${packets.length} frames** | **Discovered Network Nodes**: **${nodes.length} endpoints**\n\n${mermaid}\n\n💡 *Tip: Click on the **Call Flow Ladder** tab in the navigation bar to inspect this diagram in full interactive zoom with bidirectional packet inspection.*`,
+      provider: 'TraceIQ Sequence Synthesis Engine'
+    };
+  }
 
   // 1A. Direct Frame & Key Packet Locator (e.g. "What is the exact packet number you checked?", "Which packet is the main packet?")
   if (queryLower.includes('which packet') || queryLower.includes('what packet') || queryLower.includes('packet number') || queryLower.includes('frame number') || queryLower.includes('which frame') || queryLower.includes('packets did we check') || queryLower.includes('what frames') || queryLower.includes('which packet number did we check') || queryLower.includes('what packet did we check') || queryLower.includes('exact packet') || queryLower.includes('main packet') || queryLower.includes('key packet') || queryLower.includes('smoking gun') || queryLower.includes('packet analyzed')) {
@@ -196,7 +235,7 @@ You specialize in:
     const tonMatch = mainPacket?.raw_text?.match(/Type of number[^:]*:\s*([^\r\n]+)/i)?.[1] || 'Alphanumeric (0x05)';
     const npiMatch = mainPacket?.raw_text?.match(/Numbering plan indicator[^:]*:\s*([^\r\n]+)/i)?.[1] || 'Unknown (0x00)';
     const origMatch = mainPacket?.raw_text?.match(/Originator address:\s*([^\r\n]+)/i)?.[1] || 'BuzonDeVoz';
-    const recMatch = mainPacket?.to_header || mainPacket?.raw_text?.match(/Recipient address:\s*([^\r\n]+)/i)?.[1] || '573338066269';
+    const recMatch = mainPacket?.to_header || mainPacket?.raw_text?.match(/Recipient address:\s*([^\r\n]+)/i)?.[1] || mainPacket?.destination || 'N/A';
     const serviceTypeMatch = mainPacket?.raw_text?.match(/Service type:\s*([^\r\n]+)/i)?.[1] || (mainPacket?.info?.includes('MCN') ? 'MCN' : 'Standard');
 
     let answer = `### 🎯 Primary "Smoking Gun" Packet: \`Frame #${mainPacket.index}\`\n\n`;
@@ -314,8 +353,9 @@ You specialize in:
   if (queryLower.includes('hcmn') || queryLower.includes('mcn_multiple') || queryLower.includes('buzondevoz') || queryLower.includes('source_addr_ton') || queryLower.includes('source_addr_npi') || queryLower.includes('vmassmppserviceparams') || queryLower.includes('not for hcmn') || queryLower.includes('sending correctly.. but not for hcmn') || queryLower.includes('mcn vs hcmn') || (queryLower.includes('mcn') && queryLower.includes('multiple'))) {
     const smppSubmitPackets = packets.filter(p => p.protocol === 'SMPP' && (p.info?.includes('Submit_sm') || p.raw_text?.includes('Submit_sm')));
     const submitPkt = smppSubmitPackets[0];
-    const frameNum = submitPkt ? submitPkt.index : 137839;
-    const recipient = submitPkt?.to_header?.replace(/[<>\s]/g, '') || '573338066269';
+    const frameNum = submitPkt ? submitPkt.index : (packets[0]?.index || 1);
+    const recipient = submitPkt?.to_header?.replace(/[<>\s]/g, '') || submitPkt?.destination || 'N/A';
+    const mcoIp = submitPkt?.destination || 'SMSC Core';
 
     let hcmnAnswer = `### 🎯 Carrier R&D Diagnosis: MCN Succeeded but Consolidated HCMN Failed (\`VMASSMPPServiceParams\`)\n\n`;
     hcmnAnswer += `**Architecture Target**: **VMAS SMPP Dispatcher (smppMgr) ➔ MCO SMSC Interface**  \n`;
@@ -332,7 +372,7 @@ You specialize in:
     hcmnAnswer += `  Originator address: BuzonDeVoz\n`;
     hcmnAnswer += `  Recipient address: ${recipient}\n`;
     hcmnAnswer += `  \`\`\`\n`;
-    hcmnAnswer += `* **Result for MCN**: Dispatched successfully over TCP port 9000 to MCO SMSC (\`10.64.165.19\`) and acknowledged with \`Submit_sm - resp: "Ok"\` (Status: \`0x00000000\`).\n\n`;
+    hcmnAnswer += `* **Result for MCN**: Dispatched successfully over transport to SMSC (\`${mcoIp}\`) and acknowledged with \`Submit_sm - resp: "Ok"\` (Status: \`0x00000000\`).\n\n`;
 
     hcmnAnswer += `---\n\n`;
     hcmnAnswer += `### 🔬 2. Why HCMN (Header Consolidated Missed Notification) Fails (Root Cause):\n`;
@@ -518,10 +558,10 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
     const nfamSubmit = smppPackets.filter(p => (p.info || '').includes('Service: NFAM') || (p.raw_text || '').includes('NFAM'));
 
     if (smppPackets.length > 0 || (pcapContext?.file_name || '').toLowerCase().includes('mcn') || (pcapContext?.file_name || '').toLowerCase().includes('vmas')) {
-      const recipient = mcnSubmit[0]?.to_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573338066269';
-      const originator = mcnSubmit[0]?.from_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573202711497';
-      const mcoIp = mcnSubmit[0]?.destination || '10.64.165.19';
-      const vmasIp = mcnSubmit[0]?.source || '10.64.165.50';
+      const recipient = mcnSubmit[0]?.to_header?.replace(/[<>\s]/g, '').replace('tel:', '') || mcnSubmit[0]?.destination || 'Destination MSISDN';
+      const originator = mcnSubmit[0]?.from_header?.replace(/[<>\s]/g, '').replace('tel:', '') || mcnSubmit[0]?.source || 'Originating MSISDN';
+      const mcoIp = mcnSubmit[0]?.destination || 'MCO SMSC';
+      const vmasIp = mcnSubmit[0]?.source || 'VMAS Application Server';
 
       return {
         answer: `### 🎯 SMPP Notification & MCN vs NFAM Analysis for \`${pcapContext?.file_name || 'Active Capture'}\`
@@ -851,10 +891,10 @@ ${topFault.remediation ? `* **Remediation Details**: \`${topFault.remediation}\`
     const hasNfamIssue = pcapContext?.issues?.some((i: any) => i.id === 'iss_vmas_missing_nfam_smpp' || i.title?.toLowerCase().includes('nfam'));
 
     if (hasNfamIssue || (smppPkts.length > 0 && mcnSubmit.length > 0 && nfamSubmit.length === 0) || (fileName.toLowerCase().includes('vmas') && fileName.toLowerCase().includes('16sept'))) {
-      const recipient = mcnSubmit[0]?.to_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573338066269';
-      const originator = mcnSubmit[0]?.from_header?.replace(/[<>\s]/g, '').replace('tel:', '') || '573202711497';
-      const mcoIp = mcnSubmit[0]?.destination || '10.64.165.19';
-      const vmasIp = mcnSubmit[0]?.source || '10.64.165.50';
+      const recipient = mcnSubmit[0]?.to_header?.replace(/[<>\s]/g, '').replace('tel:', '') || mcnSubmit[0]?.destination || 'Destination MSISDN';
+      const originator = mcnSubmit[0]?.from_header?.replace(/[<>\s]/g, '').replace('tel:', '') || mcnSubmit[0]?.source || 'Originating MSISDN';
+      const mcoIp = mcnSubmit[0]?.destination || 'MCO SMSC';
+      const vmasIp = mcnSubmit[0]?.source || 'VMAS Application Server';
 
       return {
         answer: `### 🎯 SMPP Notification & MCN vs NFAM Root Cause Analysis for \`${fileName}\`
