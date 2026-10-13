@@ -188,7 +188,7 @@ export const DashboardView: React.FC = () => {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-heading font-bold transition-all ${
                 viewMode === 'EXECUTIVE'
                   ? 'bg-ag-primary text-black shadow-glow-primary'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
             >
               <Briefcase className="w-3.5 h-3.5" />
@@ -199,7 +199,7 @@ export const DashboardView: React.FC = () => {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-heading font-bold transition-all ${
                 viewMode === 'TECHNICAL'
                   ? 'bg-ag-primary text-black shadow-glow-primary'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
               }`}
             >
               <Wrench className="w-3.5 h-3.5" />
@@ -220,24 +220,24 @@ export const DashboardView: React.FC = () => {
       {/* 2. Hero Root Cause Verdict & Health Cockpit Card */}
       <div className={`p-5 sm:p-6 rounded-2xl border shadow-sm transition-all ${
         isCritical 
-          ? 'bg-gradient-to-br from-rose-950/20 via-slate-950 to-slate-950 border-rose-500/30' 
+          ? 'bg-rose-50/70 dark:bg-gradient-to-br dark:from-rose-950/20 dark:via-slate-950 dark:to-slate-950 border-rose-200 dark:border-rose-500/30' 
           : isHealthy 
-            ? 'bg-gradient-to-br from-emerald-950/20 via-slate-950 to-slate-950 border-emerald-500/30'
-            : 'bg-gradient-to-br from-amber-950/20 via-slate-950 to-slate-950 border-amber-500/30'
+            ? 'bg-emerald-50/70 dark:bg-gradient-to-br dark:from-emerald-950/20 dark:via-slate-950 dark:to-slate-950 border-emerald-200 dark:border-emerald-500/30'
+            : 'bg-amber-50/70 dark:bg-gradient-to-br dark:from-amber-950/20 dark:via-slate-950 dark:to-slate-950 border-amber-200 dark:border-amber-500/30'
       }`}>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           
           {/* Health Score Gauge Display */}
           <div className="flex items-center gap-4 shrink-0">
-            <div className={`relative w-20 h-20 rounded-2xl border flex flex-col items-center justify-center shrink-0 shadow-lg ${
+            <div className={`relative w-20 h-20 rounded-2xl border flex flex-col items-center justify-center shrink-0 shadow-sm dark:shadow-lg ${
               isCritical
-                ? 'bg-rose-500/10 border-rose-500/40 text-rose-400'
+                ? 'bg-rose-100/80 dark:bg-rose-500/10 border-rose-300 dark:border-rose-500/40 text-rose-700 dark:text-rose-400'
                 : isHealthy
-                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                  : 'bg-amber-500/10 border-amber-500/40 text-amber-400'
+                  ? 'bg-emerald-100/80 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-amber-100/80 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40 text-amber-700 dark:text-amber-400'
             }`}>
               <span className="text-2xl font-bold font-mono tracking-tight">{healthScore}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider opacity-80">Health</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider opacity-90">Health</span>
               <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-ping ${
                 isCritical ? 'bg-rose-500' : isHealthy ? 'bg-emerald-500' : 'bg-amber-500'
               }`} />
@@ -246,15 +246,19 @@ export const DashboardView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider ${
-                  isCritical ? 'bg-rose-500/20 text-rose-300' : isHealthy ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
+                  isCritical 
+                    ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30' 
+                    : isHealthy 
+                      ? 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30' 
+                      : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30'
                 }`}>
                   {isCritical ? 'Critical Issue Detected' : isHealthy ? 'Healthy Session' : 'Warning Observed'}
                 </span>
-                <span className="text-xs text-slate-400 font-mono">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                   {packets.length > 0 ? `${packets.length.toLocaleString()} Packets Analyzed` : `${currentLog?.total_lines.toLocaleString()} Log Lines`}
                 </span>
               </div>
-              <h2 className="text-base sm:text-lg font-heading font-bold text-slate-100 mt-1 flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-heading font-bold text-slate-900 dark:text-slate-100 mt-1 flex items-center gap-2">
                 <span>{rootCauseDetails.verdict}</span>
               </h2>
             </div>
@@ -264,15 +268,15 @@ export const DashboardView: React.FC = () => {
           <div className="flex items-center gap-2.5 flex-wrap">
             <button
               onClick={handleCopyCustomerBrief}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-xs text-slate-200 transition-all font-mono"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 transition-all font-mono shadow-2xs"
               title="Copy executive customer-facing brief"
             >
-              {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedBrief ? <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedBrief ? 'Brief Copied!' : 'Copy Customer Brief'}</span>
             </button>
             <button
               onClick={() => handleTriggerAiPrompt("What is the root cause of this failure?")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ag-primary/20 hover:bg-ag-primary/30 border border-ag-primary/40 text-ag-primary text-xs font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-ag-primary/20 hover:bg-ag-primary/30 border border-ag-primary/40 text-emerald-800 dark:text-ag-primary text-xs font-bold transition-all"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Ask AI Why This Failed</span>
@@ -281,23 +285,23 @@ export const DashboardView: React.FC = () => {
         </div>
 
         {/* Detailed Breakdown Box */}
-        <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4 border-t border-slate-800/80 text-xs">
+        <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-800/80 text-xs">
           <div className="space-y-1.5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-400 flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
               <span>What Broke (Technical Root Cause)</span>
             </div>
-            <p className="text-slate-300 leading-relaxed font-sans">
+            <p className="text-slate-800 dark:text-slate-300 leading-relaxed font-sans">
               {formatInlineMarkdown(rootCauseDetails.description)}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Wrench className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-400 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Prescribed Engineering Solution</span>
             </div>
-            <p className="text-slate-300 leading-relaxed font-sans">
+            <p className="text-slate-800 dark:text-slate-300 leading-relaxed font-sans">
               {formatInlineMarkdown(rootCauseDetails.solution)}
             </p>
           </div>
@@ -305,8 +309,8 @@ export const DashboardView: React.FC = () => {
 
         {/* Customer Ready Note */}
         {viewMode === 'EXECUTIVE' && (
-          <div className="mt-4 p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-800/40 text-xs text-indigo-200 leading-relaxed">
-            <span className="font-bold text-indigo-400 mr-1.5">👔 Manager / Client Brief:</span>
+          <div className="mt-4 p-3.5 rounded-xl bg-indigo-50/90 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/40 text-xs text-indigo-950 dark:text-indigo-200 leading-relaxed">
+            <span className="font-bold text-indigo-700 dark:text-indigo-400 mr-1.5">👔 Manager / Client Brief:</span>
             <em>"{rootCauseDetails.sugarcoated}"</em>
           </div>
         )}
@@ -317,60 +321,60 @@ export const DashboardView: React.FC = () => {
         
         {/* Card 1: Calling Subscriber */}
         <div className="bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs">
             <span className="font-mono text-[11px] uppercase tracking-wider">Calling Party (MSISDN)</span>
-            <Phone className="w-4 h-4 text-cyan-400" />
+            <Phone className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
           </div>
-          <div className="text-base font-bold font-mono text-slate-100 truncate">
+          <div className="text-base font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
             {sessionIdentifiers.callingNumber}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-cyan-400" />
+          <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-cyan-500" />
             <span>Originating Subscriber (VoLTE / 4G)</span>
           </div>
         </div>
 
         {/* Card 2: Called Service / Network Element */}
         <div className="bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs">
             <span className="font-mono text-[11px] uppercase tracking-wider">Terminating Service</span>
-            <Server className="w-4 h-4 text-emerald-400" />
+            <Server className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <div className="text-base font-bold font-mono text-slate-100 truncate">
+          <div className="text-base font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
             {sessionIdentifiers.calledParty}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
             <span>Carrier Application Core (VMAS / SBC)</span>
           </div>
         </div>
 
         {/* Card 3: Session Timeline & Latency */}
         <div className="bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs">
             <span className="font-mono text-[11px] uppercase tracking-wider">Session Timeline</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+            <Clock className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="text-base font-bold font-mono text-slate-100 truncate">
+          <div className="text-base font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
             {currentPcap?.duration_sec ? `${currentPcap.duration_sec.toFixed(2)}s Duration` : 'Live Stream'}
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
+          <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
             <span>Setup: 2.4s • Media: {currentPcap?.duration_sec ? (currentPcap.duration_sec - 2.4).toFixed(1) : 0}s</span>
           </div>
         </div>
 
         {/* Card 4: Audio / Media Quality */}
         <div className="bg-white dark:bg-ag-darkCard p-4 rounded-2xl border border-slate-200 dark:border-ag-darkBorder shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
+          <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs">
             <span className="font-mono text-[11px] uppercase tracking-wider">Audio Media Codec</span>
-            <Radio className="w-4 h-4 text-purple-400" />
+            <Radio className="w-4 h-4 text-purple-600 dark:text-purple-400" />
           </div>
-          <div className="text-base font-bold font-mono text-slate-100 truncate">
+          <div className="text-base font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
             AMR-WB (16 kHz HD Voice)
           </div>
-          <div className="text-[11px] text-slate-400 flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-purple-400" />
+          <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-purple-500" />
             <span>Packet Loss: 0.0% • Jitter: 1.2ms</span>
           </div>
         </div>
@@ -388,11 +392,11 @@ export const DashboardView: React.FC = () => {
               <div>
                 <h3 className="font-heading font-bold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <span>The Smoking Gun Packet: Frame #{smokingGunPacket.packet.index}</span>
-                  <span className="px-2 py-0.2 rounded-full text-[10px] font-mono bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  <span className="px-2 py-0.2 rounded-full text-[10px] font-mono bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-500/20">
                     Primary Evidence
                   </span>
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-600 dark:text-slate-400">
                   {smokingGunPacket.reason}
                 </p>
               </div>
@@ -400,7 +404,7 @@ export const DashboardView: React.FC = () => {
 
             <button
               onClick={handleInspectSmokingGun}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-ag-primary text-xs font-mono text-slate-300 hover:text-ag-primary transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:border-ag-primary text-xs font-mono text-slate-700 dark:text-slate-300 hover:text-ag-primary transition-all cursor-pointer"
             >
               <span>Inspect Wire Bytes in Explorer</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -409,16 +413,16 @@ export const DashboardView: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-400 uppercase block mb-0.5">Packet Index & Time</span>
-              <span className="font-bold text-slate-200">Frame #{smokingGunPacket.packet.index} @ {smokingGunPacket.packet.time}s</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block mb-0.5">Packet Index & Time</span>
+              <span className="font-bold text-slate-800 dark:text-slate-200">Frame #{smokingGunPacket.packet.index} @ {smokingGunPacket.packet.time}s</span>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-400 uppercase block mb-0.5">Protocol & Action</span>
-              <span className="font-bold text-ag-primary">{smokingGunPacket.packet.protocol} {smokingGunPacket.packet.sip_method || smokingGunPacket.packet.response_code || smokingGunPacket.packet.info}</span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block mb-0.5">Protocol & Action</span>
+              <span className="font-bold text-emerald-700 dark:text-ag-primary">{smokingGunPacket.packet.protocol} {smokingGunPacket.packet.sip_method || smokingGunPacket.packet.response_code || smokingGunPacket.packet.info}</span>
             </div>
             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-              <span className="text-[10px] text-slate-400 uppercase block mb-0.5">Wire Transmission Hop</span>
-              <span className="font-bold text-slate-300 truncate block" title={`${smokingGunPacket.packet.source} -> ${smokingGunPacket.packet.destination}`}>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase block mb-0.5">Wire Transmission Hop</span>
+              <span className="font-bold text-slate-800 dark:text-slate-300 truncate block" title={`${smokingGunPacket.packet.source} -> ${smokingGunPacket.packet.destination}`}>
                 {smokingGunPacket.packet.source} ➔ {smokingGunPacket.packet.destination}
               </span>
             </div>
@@ -440,7 +444,7 @@ export const DashboardView: React.FC = () => {
           </div>
           <button
             onClick={() => setActiveTab('callflow')}
-            className="flex items-center gap-1 text-xs font-mono text-slate-400 hover:text-ag-primary transition-colors"
+            className="flex items-center gap-1 text-xs font-mono text-slate-600 dark:text-slate-400 hover:text-ag-primary transition-colors"
           >
             <span>Full-Screen Ladder</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -453,7 +457,7 @@ export const DashboardView: React.FC = () => {
 
       {/* 6. Quick AI Action Grid ("Ask AI about this session") */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
           <Sparkles className="w-3.5 h-3.5 text-ag-primary" />
           <span>Instant AI Deep-Dive Inquiries</span>
         </div>

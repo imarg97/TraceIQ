@@ -95,7 +95,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose }) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 dark:bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 font-sans">
       <div className="tcq-card w-full max-w-2xl rounded-2xl p-6 sm:p-7 shadow-xl border space-y-6 max-h-[90vh] overflow-y-auto relative">
         {/* Header */}
         <div className="flex items-center justify-between border-b tcq-border pb-3">

@@ -36,3 +36,37 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-ag-primaryGlow;
 }
+
+/* TraceIQ Semantic UI Utility Tokens (Light & Dark Theme Harmonized) */
+@layer utilities {
+  .tcq-card {
+    @apply bg-white dark:bg-ag-darkCard border-slate-200 dark:border-ag-darkBorder;
+  }
+  .tcq-card-subtle {
+    @apply bg-slate-50 dark:bg-ag-darkSurface border-slate-200 dark:border-ag-darkBorder;
+  }
+  .tcq-text-title {
+    @apply text-slate-900 dark:text-slate-100;
+  }
+  .tcq-text-body {
+    @apply text-slate-700 dark:text-slate-300;
+  }
+  .tcq-text-muted {
+    @apply text-slate-500 dark:text-slate-400;
+  }
+  .tcq-border {
+    @apply border-slate-200 dark:border-ag-darkBorder;
+  }
+  .tcq-alert-emerald {
+    @apply bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30;
+  }
+  .tcq-alert-rose {
+    @apply bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30;
+  }
+  .tcq-alert-indigo {
+    @apply bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/30;
+  }
+  .tcq-btn-inactive {
+    @apply bg-slate-50 dark:bg-ag-darkSurface text-slate-700 dark:text-slate-300 border-slate-200 dark:border-ag-darkBorder hover:border-ag-primary hover:text-ag-primary;
+  }
+}

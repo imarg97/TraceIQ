@@ -112,8 +112,8 @@ export const CompareView: React.FC = () => {
             ))}
           </div>
 
-          <div className="tcq-alert-indigo p-4 rounded-xl space-y-1.5 shadow-xs">
-            <span className="text-xs font-bold tcq-alert-indigo-title uppercase tracking-wider block font-heading">
+          <div className="tcq-alert-indigo p-4 rounded-xl space-y-1.5 shadow-xs border">
+            <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider block font-heading">
               Executive Change Summary:
             </span>
             <div className="text-xs leading-relaxed font-sans whitespace-pre-wrap font-medium">

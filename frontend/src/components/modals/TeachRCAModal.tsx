@@ -100,7 +100,7 @@ export const TeachRCAModal: React.FC<TeachRCAModalProps> = ({
             </div>
           </div>
 
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-ag-darkSurface transition-all">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-ag-darkSurface transition-all">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -322,7 +322,7 @@ export const TeachRCAModal: React.FC<TeachRCAModalProps> = ({
                       )}
                     </div>
                     <p className="text-slate-600 dark:text-slate-300">{r.technicalVerdict}</p>
-                    <div className="text-[10px] font-mono text-slate-400">
+                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
                       <strong>Keywords:</strong> {r.triggerKeywords.join(', ')}
                     </div>
                   </div>

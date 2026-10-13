@@ -96,9 +96,9 @@ export function App() {
               </div>
             </div>
           ) : error ? (
-            <div className="bg-ag-darkCard p-8 rounded-2xl border border-rose-500/30 text-center max-w-lg mx-auto my-12 space-y-3 shadow-lg shadow-rose-500/10">
-              <span className="text-sm font-bold text-rose-500 block font-heading">Analysis Error</span>
-              <p className="text-xs text-slate-400">{error}</p>
+            <div className="bg-white dark:bg-ag-darkCard p-8 rounded-2xl border border-rose-300 dark:border-rose-500/30 text-center max-w-lg mx-auto my-12 space-y-3 shadow-lg shadow-rose-500/10">
+              <span className="text-sm font-bold text-rose-600 dark:text-rose-400 block font-heading">Analysis Error</span>
+              <p className="text-xs text-slate-600 dark:text-slate-400">{error}</p>
               <button
                 onClick={() => setIsUploadOpen(true)}
                 className="px-4 py-2 rounded-lg bg-ag-primary hover:bg-ag-primary/90 text-black text-xs font-bold font-heading shadow-glow-primary active:scale-95 transition-all"

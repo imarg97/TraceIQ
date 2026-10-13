@@ -69,18 +69,18 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
     const getNodeRole = (name: string): { role: Participant['role']; color: string; icon: Participant['icon'] } => {
       const lower = name.toLowerCase();
       if (lower.includes('ue') || lower.includes('client') || lower.includes('caller') || lower.includes('user') || lower.includes('phone') || lower.includes('subscriber')) {
-        return { role: 'client', color: 'from-blue-500/20 to-cyan-500/10 border-cyan-500/40 text-cyan-400', icon: 'phone' };
+        return { role: 'client', color: 'from-blue-500/10 to-cyan-500/5 dark:from-blue-500/20 dark:to-cyan-500/10 border-cyan-200 dark:border-cyan-500/40 text-cyan-700 dark:text-cyan-400', icon: 'phone' };
       }
       if (lower.includes('db') || lower.includes('oracle') || lower.includes('sql') || lower.includes('adapter') || lower.includes('redis')) {
-        return { role: 'db', color: 'from-amber-500/20 to-orange-500/10 border-amber-500/40 text-amber-400', icon: 'db' };
+        return { role: 'db', color: 'from-amber-500/10 to-orange-500/5 dark:from-amber-500/20 dark:to-orange-500/10 border-amber-200 dark:border-amber-500/40 text-amber-700 dark:text-amber-400', icon: 'db' };
       }
       if (lower.includes('mrf') || lower.includes('media') || lower.includes('audio') || lower.includes('rtp') || lower.includes('msml')) {
-        return { role: 'media', color: 'from-purple-500/20 to-pink-500/10 border-purple-500/40 text-purple-400', icon: 'media' };
+        return { role: 'media', color: 'from-purple-500/10 to-pink-500/5 dark:from-purple-500/20 dark:to-pink-500/10 border-purple-200 dark:border-purple-500/40 text-purple-700 dark:text-purple-400', icon: 'media' };
       }
       if (lower.includes('core') || lower.includes('vmas') || lower.includes('scxml') || lower.includes('cscf') || lower.includes('hss')) {
-        return { role: 'core', color: 'from-emerald-500/20 to-teal-500/10 border-emerald-500/40 text-emerald-400', icon: 'server' };
+        return { role: 'core', color: 'from-emerald-500/10 to-teal-500/5 dark:from-emerald-500/20 dark:to-teal-500/10 border-emerald-200 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400', icon: 'server' };
       }
-      return { role: 'proxy', color: 'from-indigo-500/20 to-blue-500/10 border-indigo-500/40 text-indigo-400', icon: 'server' };
+      return { role: 'proxy', color: 'from-indigo-500/10 to-blue-500/5 dark:from-indigo-500/20 dark:to-blue-500/10 border-indigo-200 dark:border-indigo-500/40 text-indigo-700 dark:text-indigo-400', icon: 'server' };
     };
 
     const registerParticipant = (id: string, label?: string) => {
@@ -195,21 +195,21 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
   };
 
   return (
-    <div className="my-3 rounded-2xl overflow-hidden border border-slate-700/60 bg-slate-950 shadow-xl font-sans">
+    <div className="my-3 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-slate-950 shadow-xs dark:shadow-xl font-sans">
       {/* Sequence Header Toolbar */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 text-xs">
         <div className="flex items-center gap-2">
           <div className="p-1 rounded-md bg-ag-primary/10 border border-ag-primary/30 text-ag-primary">
             <GitCommitHorizontal className="w-4 h-4" />
           </div>
           <div>
-            <div className="font-heading font-bold text-slate-100 flex items-center gap-2 text-xs">
+            <div className="font-heading font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-xs">
               <span>Signaling Call Flow Sequence</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
                 Mermaid Visual Engine
               </span>
             </div>
-            <div className="text-[10px] font-mono text-slate-400">
+            <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
               {participants.length} Discovered Endpoints • {steps.length} Sequenced Transactions
             </div>
           </div>
@@ -217,13 +217,13 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
 
         <div className="flex items-center gap-1.5">
           {/* Toggle View Mode */}
-          <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[11px] font-mono">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px] font-mono">
             <button
               onClick={() => setViewMode('VISUAL')}
               className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all ${
                 viewMode === 'VISUAL'
                   ? 'bg-ag-primary text-black font-bold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Eye className="w-3 h-3" />
@@ -234,7 +234,7 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
               className={`flex items-center gap-1 px-2 py-1 rounded-md transition-all ${
                 viewMode === 'CODE'
                   ? 'bg-ag-primary text-black font-bold shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               }`}
             >
               <Code2 className="w-3 h-3" />
@@ -245,10 +245,10 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
           {/* Copy Button */}
           <button
             onClick={handleCopyCode}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-800 hover:border-slate-700 bg-slate-950 text-slate-300 hover:text-ag-primary text-[11px] font-mono transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-300 hover:text-ag-primary text-[11px] font-mono transition-colors shadow-2xs"
             title="Copy raw Mermaid code"
           >
-            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+            {copied ? <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> : <Copy className="w-3 h-3" />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
@@ -256,11 +256,11 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
 
       {/* Body Area */}
       {viewMode === 'CODE' ? (
-        <pre className="p-4 text-[11px] font-mono text-slate-200 overflow-x-auto whitespace-pre leading-relaxed bg-slate-950">
+        <pre className="p-4 text-[11px] font-mono text-slate-800 dark:text-slate-200 overflow-x-auto whitespace-pre leading-relaxed bg-slate-50 dark:bg-slate-950">
           {code}
         </pre>
       ) : (
-        <div className="p-4 overflow-x-auto bg-radial from-slate-900/40 to-slate-950">
+        <div className="p-4 overflow-x-auto bg-slate-50/50 dark:bg-radial dark:from-slate-900/40 dark:to-slate-950">
           {participants.length === 0 ? (
             <div className="p-6 text-center text-slate-400 text-xs font-mono">
               No participants found in sequence diagram.
@@ -269,7 +269,7 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
             <div className="min-w-[540px] space-y-4">
               {/* Participant Headers */}
               <div 
-                className="grid gap-2 border-b border-slate-800/80 pb-3"
+                className="grid gap-2 border-b border-slate-200 dark:border-slate-800/80 pb-3"
                 style={{ gridTemplateColumns: `repeat(${participants.length}, minmax(130px, 1fr))` }}
               >
                 {participants.map((p) => {
@@ -278,16 +278,16 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                       key={p.id}
                       className={`flex flex-col items-center justify-center p-2.5 rounded-xl border bg-gradient-to-b ${p.color} shadow-xs text-center`}
                     >
-                      <div className="w-6 h-6 rounded-lg bg-black/40 flex items-center justify-center mb-1 text-current shrink-0">
+                      <div className="w-6 h-6 rounded-lg bg-white/80 dark:bg-black/40 border border-slate-200/60 dark:border-transparent flex items-center justify-center mb-1 text-current shrink-0">
                         {p.icon === 'phone' && <Smartphone className="w-3.5 h-3.5" />}
                         {p.icon === 'server' && <Server className="w-3.5 h-3.5" />}
                         {p.icon === 'db' && <Database className="w-3.5 h-3.5" />}
                         {p.icon === 'media' && <Layers className="w-3.5 h-3.5" />}
                       </div>
-                      <div className="font-heading font-bold text-[11px] text-slate-100 truncate w-full" title={p.label}>
+                      <div className="font-heading font-bold text-[11px] text-slate-900 dark:text-slate-100 truncate w-full" title={p.label}>
                         {p.label}
                       </div>
-                      <div className="text-[9px] font-mono text-slate-400 truncate w-full" title={p.id}>
+                      <div className="text-[9px] font-mono text-slate-500 dark:text-slate-400 truncate w-full" title={p.id}>
                         {p.id}
                       </div>
                     </div>
@@ -304,7 +304,7 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                 >
                   {participants.map((p) => (
                     <div key={`guide_${p.id}`} className="flex justify-center">
-                      <div className="w-px h-full border-r border-dashed border-slate-800/70" />
+                      <div className="w-px h-full border-r border-dashed border-slate-200 dark:border-slate-800/70" />
                     </div>
                   ))}
                 </div>
@@ -331,26 +331,26 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                   const stepNotes = notes.filter(n => n.atStepIndex === idx);
 
                   // Badging & Arrow Styling
-                  let pillStyle = 'bg-slate-800 text-slate-200 border-slate-700';
+                  let pillStyle = 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700 shadow-2xs';
                   let lineStroke = '#64748b'; // slate-500
 
                   if (step.isError) {
-                    pillStyle = 'bg-rose-950/90 text-rose-300 border-rose-500/50 shadow-rose-950/50 shadow-sm';
+                    pillStyle = 'bg-rose-50 dark:bg-rose-950/90 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-500/50 shadow-2xs';
                     lineStroke = '#f43f5e';
                   } else if (step.isSuccess) {
-                    pillStyle = 'bg-emerald-950/90 text-emerald-300 border-emerald-500/50 shadow-emerald-950/50 shadow-sm';
+                    pillStyle = 'bg-emerald-50 dark:bg-emerald-950/90 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/50 shadow-2xs';
                     lineStroke = '#10b981';
                   } else if (step.isProvisional) {
-                    pillStyle = 'bg-amber-950/90 text-amber-300 border-amber-500/50 shadow-amber-950/50 shadow-sm';
+                    pillStyle = 'bg-amber-50 dark:bg-amber-950/90 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-500/50 shadow-2xs';
                     lineStroke = '#f59e0b';
                   } else if (step.protocolBadge === 'SIP') {
-                    pillStyle = 'bg-cyan-950/90 text-cyan-300 border-cyan-500/50 shadow-cyan-950/50 shadow-sm';
+                    pillStyle = 'bg-cyan-50 dark:bg-cyan-950/90 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-500/50 shadow-2xs';
                     lineStroke = '#06b6d4';
                   } else if (step.protocolBadge === 'SMPP') {
-                    pillStyle = 'bg-purple-950/90 text-purple-300 border-purple-500/50 shadow-purple-950/50 shadow-sm';
+                    pillStyle = 'bg-purple-50 dark:bg-purple-950/90 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-500/50 shadow-2xs';
                     lineStroke = '#a855f7';
                   } else if (step.protocolBadge === 'DB') {
-                    pillStyle = 'bg-indigo-950/90 text-indigo-300 border-indigo-500/50 shadow-indigo-950/50 shadow-sm';
+                    pillStyle = 'bg-indigo-50 dark:bg-indigo-950/90 text-indigo-800 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/50 shadow-2xs';
                     lineStroke = '#6366f1';
                   }
 
@@ -359,8 +359,8 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                       {/* Optional Notes Before Step */}
                       {stepNotes.map(n => (
                         <div key={n.id} className="relative z-10 my-2 px-6">
-                          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-[11px] font-mono text-amber-300 flex items-center gap-2 shadow-xs">
-                            <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-2 text-[11px] font-mono text-amber-800 dark:text-amber-300 flex items-center gap-2 shadow-xs">
+                            <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                             <span>{n.text}</span>
                           </div>
                         </div>
@@ -371,7 +371,7 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                         onMouseEnter={() => setHoveredStep(step.index)}
                         onMouseLeave={() => setHoveredStep(null)}
                         className={`relative z-10 py-1.5 px-1 rounded-xl transition-all duration-150 ${
-                          hoveredStep === step.index ? 'bg-slate-800/40 ring-1 ring-slate-700/60' : ''
+                          hoveredStep === step.index ? 'bg-slate-100/80 dark:bg-slate-800/40 ring-1 ring-slate-200 dark:ring-slate-700/60' : ''
                         }`}
                       >
                         {isSelf ? (
@@ -383,8 +383,8 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                             }}
                             className="relative flex items-center gap-2"
                           >
-                            <div className="h-6 w-8 border-t-2 border-r-2 border-b-2 rounded-r-lg border-slate-600 flex items-center justify-end">
-                              <ArrowLeft className="w-3 h-3 text-slate-400 -mr-1" />
+                            <div className="h-6 w-8 border-t-2 border-r-2 border-b-2 rounded-r-lg border-slate-400 dark:border-slate-600 flex items-center justify-end">
+                              <ArrowLeft className="w-3 h-3 text-slate-500 dark:text-slate-400 -mr-1" />
                             </div>
                             <div className={`px-2 py-0.5 rounded-md border text-[10px] font-mono truncate ${pillStyle}`}>
                               {step.label}
@@ -400,15 +400,15 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                             className="relative flex flex-col items-center justify-center"
                           >
                             {/* Message Label Pill */}
-                            <div className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1.5 max-w-full shadow-md z-20 ${pillStyle}`}>
-                              <span className="font-bold opacity-70">#{step.index}</span>
+                            <div className={`px-2.5 py-1 rounded-lg border text-[11px] font-mono flex items-center gap-1.5 max-w-full shadow-xs z-20 ${pillStyle}`}>
+                              <span className="font-bold opacity-75">#{step.index}</span>
                               {step.frameNumber && (
-                                <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-black/40 text-ag-primary">
+                                <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-slate-100 dark:bg-black/40 text-ag-primary">
                                   Frame #{step.frameNumber}
                                 </span>
                               )}
                               <span className="truncate font-semibold">{step.label.replace(/\[Frame\s*#?\d+\]/, '').trim()}</span>
-                              {step.isError && <XCircle className="w-3 h-3 text-rose-400 shrink-0 ml-0.5" />}
+                              {step.isError && <XCircle className="w-3 h-3 text-rose-500 dark:text-rose-400 shrink-0 ml-0.5" />}
                             </div>
 
                             {/* SVG Arrow Line */}
@@ -455,8 +455,8 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
                 {/* Trailing Notes */}
                 {notes.filter(n => n.atStepIndex >= steps.length).map(n => (
                   <div key={n.id} className="relative z-10 my-2 px-6">
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-[11px] font-mono text-amber-300 flex items-center gap-2 shadow-xs">
-                      <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-lg p-2 text-[11px] font-mono text-amber-800 dark:text-amber-300 flex items-center gap-2 shadow-xs">
+                      <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                       <span>{n.text}</span>
                     </div>
                   </div>
@@ -465,15 +465,15 @@ export const MermaidSequenceViewer: React.FC<MermaidSequenceViewerProps> = ({ co
 
               {/* Bottom Participant Footers */}
               <div 
-                className="grid gap-2 border-t border-slate-800/80 pt-3"
+                className="grid gap-2 border-t border-slate-200 dark:border-slate-800/80 pt-3"
                 style={{ gridTemplateColumns: `repeat(${participants.length}, minmax(130px, 1fr))` }}
               >
                 {participants.map((p) => (
                   <div 
                     key={`footer_${p.id}`}
-                    className="p-1 rounded-lg border border-slate-800 bg-slate-900/60 text-center"
+                    className="p-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 text-center"
                   >
-                    <div className="font-heading font-bold text-[10px] text-slate-300 truncate" title={p.label}>
+                    <div className="font-heading font-bold text-[10px] text-slate-700 dark:text-slate-300 truncate" title={p.label}>
                       {p.label}
                     </div>
                   </div>
