@@ -78,7 +78,8 @@ export const CallFlowView: React.FC = () => {
     const colors = ['border-blue-500 text-blue-500', 'border-ag-primary text-ag-primary', 'border-purple-500 text-purple-500', 'border-emerald-500 text-emerald-500', 'border-amber-500 text-amber-500'];
     let cIdx = 0;
 
-    for (const pkt of packets) {
+    const sampleForNodes = packets.length > 1500 ? packets.slice(0, 1500) : packets;
+    for (const pkt of sampleForNodes) {
       if (!nodeMap.has(pkt.source)) {
         const isClient = pkt.source.endsWith('.20') || pkt.source.endsWith('.8') || pkt.source.endsWith('.74') || pkt.source.endsWith('.100');
         const isCore = pkt.source.includes('192.168.4') || pkt.source.endsWith('.10');
@@ -105,16 +106,31 @@ export const CallFlowView: React.FC = () => {
         });
         cIdx++;
       }
+      if (nodeMap.size >= 8) break;
     }
 
     // Limit to max 6 clean lifelines to prevent horizontal cramming
     return Array.from(nodeMap.values()).slice(0, 6);
   }, [packets]);
 
-  // Generate sequence arrows for every packet in capture
+  // Generate sequence arrows for signaling packets in capture (optimized for high speed)
   const allSequenceArrows = useMemo(() => {
-    return packets.map((pkt, idx) => {
-      const prevPkt = idx > 0 ? packets[idx - 1] : null;
+    let flowPackets = packets;
+    if (packets.length > 1500) {
+      const signaling = packets.filter(p => 
+        p.protocol === 'SIP' || 
+        p.protocol === 'SMPP' || 
+        p.protocol === 'DIAMETER' || 
+        p.protocol === 'ISUP' || 
+        p.sip_method || 
+        (p.response_code && p.response_code >= 100) ||
+        (p.info && (p.info.includes('BYE') || p.info.includes('INVITE') || p.info.includes('Submit_sm') || p.info.includes('error')))
+      );
+      flowPackets = signaling.length > 0 ? signaling : packets.slice(0, 1500);
+    }
+
+    return flowPackets.map((pkt, idx) => {
+      const prevPkt = idx > 0 ? flowPackets[idx - 1] : null;
       const deltaMs = prevPkt ? Math.max(0, Math.round((pkt.time - prevPkt.time) * 1000)) : 0;
       const is200 = pkt.response_code === 200 || pkt.info.includes('200 OK');
       const is401 = pkt.response_code === 401 || pkt.info.includes('401');

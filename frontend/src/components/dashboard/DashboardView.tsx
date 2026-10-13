@@ -52,8 +52,9 @@ export const DashboardView: React.FC = () => {
       callId = currentLog.discovered_identifiers.call_ids[0];
     }
 
-    // Check packets
-    for (const p of packets) {
+    // Check packets (first 500 packets are sufficient for session setup discovery)
+    const samplePackets = packets.length > 500 ? packets.slice(0, 500) : packets;
+    for (const p of samplePackets) {
       if (!callingNumber && p.from_header) {
         const match = p.from_header.match(/sip:(\+?\d{8,15})@/i) || p.from_header.match(/(\+?\d{10,15})/);
         if (match) callingNumber = match[1];

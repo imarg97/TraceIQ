@@ -54,7 +54,8 @@ export const SIPExplorerView: React.FC = () => {
   ];
 
   const filteredPackets = useMemo(() => {
-    return packets.filter(p => !searchFilter || evaluateWiresharkFilter(p, searchFilter));
+    if (!searchFilter.trim()) return packets;
+    return packets.filter(p => evaluateWiresharkFilter(p, searchFilter));
   }, [packets, searchFilter]);
 
   // Reset page when filter changes

@@ -194,9 +194,10 @@ export const AICopilotView: React.FC = () => {
     const prompts: string[] = ["What is the root cause of this failure?", "Draw the call flow sequence"];
 
     const packets = currentPcap?.packets || [];
+    const samplePackets = packets.length > 500 ? packets.slice(0, 500) : packets;
 
     // 1. Genuine Call-ID discovery
-    const discoveredCallIds = Array.from(new Set(packets.map(p => p.call_id).filter(Boolean))) as string[];
+    const discoveredCallIds = Array.from(new Set(samplePackets.map(p => p.call_id).filter(Boolean))) as string[];
     if (discoveredCallIds.length > 0) {
       const topCallId = discoveredCallIds[0];
       const shortId = topCallId.length > 18 ? `${topCallId.slice(0, 15)}...` : topCallId;
@@ -204,7 +205,7 @@ export const AICopilotView: React.FC = () => {
     }
 
     // 2. Genuine error packet inspection
-    const errPkt = packets.find(p => (p.response_code && p.response_code >= 400) || p.info?.toLowerCase().includes('reject') || p.info?.toLowerCase().includes('error'));
+    const errPkt = samplePackets.find(p => (p.response_code && p.response_code >= 400) || p.info?.toLowerCase().includes('reject') || p.info?.toLowerCase().includes('error'));
     if (errPkt) {
       prompts.push(`Explain Frame #${errPkt.index} (${errPkt.sip_method || errPkt.response_code || errPkt.info})`);
     }
