@@ -20,9 +20,11 @@ interface TraceStoreState {
   isLoading: boolean;
   error: string | null;
   isReportModalOpen: boolean;
+  pendingAiPrompt: string | null;
   
   // Actions
   setActiveTab: (tab: ActiveTab) => void;
+  setPendingAiPrompt: (prompt: string | null) => void;
   setThemeMode: (mode: ThemeMode) => void;
   toggleThemeMode: () => void;
   loadSample: (sampleId: string) => Promise<void>;
@@ -80,8 +82,10 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   isLoading: false,
   error: null,
   isReportModalOpen: false,
+  pendingAiPrompt: null,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setPendingAiPrompt: (prompt) => set({ pendingAiPrompt: prompt }),
 
   setThemeMode: (mode) => {
     applyThemeToDOM(mode);

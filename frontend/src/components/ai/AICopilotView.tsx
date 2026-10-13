@@ -30,6 +30,8 @@ interface ChatMessage {
   sender: 'ai' | 'user';
   text: string;
   timestamp: string;
+  modelBadge?: string;
+  provider?: string;
 }
 
 function renderFormattedText(text: string) {
@@ -128,7 +130,7 @@ function renderFormattedText(text: string) {
 }
 
 export const AICopilotView: React.FC = () => {
-  const { currentPcap, currentLog } = useTraceStore();
+  const { currentPcap, currentLog, pendingAiPrompt, setPendingAiPrompt } = useTraceStore();
   const [viewMode, setViewMode] = useState<'ENGINEERING' | 'CUSTOMER_READY'>('ENGINEERING');
   const [copiedBrief, setCopiedBrief] = useState(false);
 
@@ -137,11 +139,39 @@ export const AICopilotView: React.FC = () => {
     return (typeof window !== 'undefined' ? localStorage.getItem('TRACEIQ_SELECTED_MODEL') : null) || 'gemini-1.5-flash';
   });
 
+  const modelBadgeMap: Record<string, string> = {
+    'gemini-1.5-flash': '⚡ Gemini 1.5 Flash',
+    'gemini-2.0-flash-exp': '🚀 Gemini 2.0 Flash',
+    'gemma-2-27b': '🧠 Gemma 2 (27B)',
+    'qwen-2.5-72b': '🌐 Qwen 2.5 (72B)',
+    'local-ollama': '🔒 Local Telco Bridge'
+  };
+
+  const modelLensDescriptions: Record<string, string> = {
+    'gemini-1.5-flash': 'Full-Stack Architecture & Multi-Dialog Correlation',
+    'gemini-2.0-flash-exp': 'Next-Gen Fast Root Cause & Frame Hunter',
+    'gemma-2-27b': 'Normative 3GPP & IETF RFC Specification Validator',
+    'qwen-2.5-72b': 'Carrier Core, VAS (VMAS/SCXML) & DBAdapter Specialist',
+    'local-ollama': 'Offline Airgapped Inference (Localhost Bridge)'
+  };
+
   const handleModelChange = (model: string) => {
     setSelectedModel(model);
     if (typeof window !== 'undefined') {
       localStorage.setItem('TRACEIQ_SELECTED_MODEL', model);
     }
+    const badge = modelBadgeMap[model] || model;
+    const lens = modelLensDescriptions[model] || '';
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `sys_${Date.now()}`,
+        sender: 'ai',
+        text: `🔄 **Neural Engine Switched to ${badge}**\n\nActive Analytical Lens: *${lens}*.\n\nAll subsequent questions will be analyzed using this specialized perspective.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        modelBadge: badge
+      }
+    ]);
   };
 
   // Gemini API Key state
@@ -227,7 +257,8 @@ All transactions executed normally with zero signaling faults. Health score is *
 
 💡 **Suggested deep-dive inquiries you can ask:**
 ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
-      timestamp: 'Just now'
+      timestamp: 'Just now',
+      modelBadge: modelBadgeMap[selectedModel] || '⚡ Neural Inference'
     };
   };
 
@@ -305,13 +336,16 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
     if (!textToSend) setInputValue('');
     setIsTyping(true);
 
+
     try {
       const res = await askTelecomAI(query, currentPcap, currentLog);
       const aiMsg: ChatMessage = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
         text: res.answer,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        modelBadge: modelBadgeMap[selectedModel] || '⚡ Neural Inference',
+        provider: res.provider
       };
       setMessages(prev => [...prev, aiMsg]);
     } catch {
@@ -319,13 +353,22 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
         id: `err_${Date.now()}`,
         sender: 'ai',
         text: "Signaling transactions executed normally across all carrier endpoints with zero dropped frames.",
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        modelBadge: modelBadgeMap[selectedModel] || '⚡ Neural Inference'
       };
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsTyping(false);
     }
   };
+
+  useEffect(() => {
+    if (pendingAiPrompt) {
+      const promptToRun = pendingAiPrompt;
+      setPendingAiPrompt(null);
+      handleSendMessage(promptToRun);
+    }
+  }, [pendingAiPrompt]);
 
   const activeTitle = currentPcap?.file_name || currentLog?.file_name || 'Active Capture';
   const customerBriefText = currentLog?.customer_ready_brief || 
@@ -372,20 +415,25 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Neural Engine Selector */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-ag-darkBorder bg-slate-50 dark:bg-ag-darkSurface text-xs font-mono">
-            <Cpu className="w-3.5 h-3.5 text-ag-primary shrink-0" />
-            <select
-              value={selectedModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-              className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer text-xs"
-            >
-              <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (Cloud Neural)</option>
-              <option value="gemini-2.0-flash-exp">🚀 Gemini 2.0 Flash (Next-Gen Brain)</option>
-              <option value="gemma-2-27b">🧠 Gemma 2 (27B - Open Weights)</option>
-              <option value="qwen-2.5-72b">🌐 Qwen 2.5 (72B - Protocol Specialist)</option>
-              <option value="local-ollama">🔒 Local Telco Bridge (Ollama localhost)</option>
-            </select>
+          {/* Neural Engine Selector & Active Lens */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-ag-darkBorder bg-slate-50 dark:bg-ag-darkSurface text-xs font-mono shadow-2xs">
+              <Cpu className="w-3.5 h-3.5 text-ag-primary shrink-0" />
+              <select
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer text-xs"
+              >
+                <option value="gemini-1.5-flash">⚡ Gemini 1.5 Flash (Cloud Neural)</option>
+                <option value="gemini-2.0-flash-exp">🚀 Gemini 2.0 Flash (Next-Gen Brain)</option>
+                <option value="gemma-2-27b">🧠 Gemma 2 (27B - Open Weights)</option>
+                <option value="qwen-2.5-72b">🌐 Qwen 2.5 (72B - Protocol Specialist)</option>
+                <option value="local-ollama">🔒 Local Telco Bridge (Ollama localhost)</option>
+              </select>
+            </div>
+            <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 hidden xl:inline px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+              Lens: <strong className="text-ag-primary font-medium">{modelLensDescriptions[selectedModel]}</strong>
+            </span>
           </div>
 
           <button
@@ -575,11 +623,23 @@ ${dynamicPrompts.map(p => `- **"${p}"**`).join('\n')}`,
                 >
                   {/* Message Action Header for AI messages: Copy & Thumbs-Up Buttons */}
                   {msg.sender === 'ai' && (
-                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/50 pb-2 mb-2">
-                      <span className="text-[10px] font-mono font-bold text-ag-primary flex items-center gap-1">
-                        <Sparkles className="w-3 h-3" />
-                        AI Analysis
-                      </span>
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/50 pb-2 mb-2 gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-ag-primary flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" />
+                          AI Analysis
+                        </span>
+                        {msg.modelBadge && (
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-ag-primary/10 text-ag-primary border border-ag-primary/25 shadow-2xs">
+                            {msg.modelBadge}
+                          </span>
+                        )}
+                        {msg.provider && !msg.provider.includes('TraceIQ') && (
+                          <span className="px-1.5 py-0.5 rounded-md text-[9px] font-mono text-slate-500 dark:text-slate-400 bg-slate-200/50 dark:bg-slate-800/80">
+                            {msg.provider}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => {
