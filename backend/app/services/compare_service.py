@@ -70,11 +70,20 @@ def compare_pcap_results(result_a: PCAPAnalysisResult, result_b: PCAPAnalysisRes
     else:
         what_changed += "Key Findings: Both captures demonstrate consistent performance characteristics."
 
+    risk_assessment = (
+        "High risk. Signaling degradation detected with increased failure rates."
+        if diff_health < -5 or diff_failed > 0
+        else (
+            "Low risk. Signaling flows are consistent and healthy across baseline captures."
+            if diff_health >= 0 and diff_failed <= 0
+            else "Moderate risk. Minor metric variances observed between captures."
+        )
+    )
+
     return PCAPCompareResult(
-        pcap_a_name=result_a.file_name,
-        pcap_b_name=result_b.file_name,
-        health_score_a=result_a.health_score,
-        health_score_b=result_b.health_score,
-        deltas=deltas,
-        ai_what_changed=what_changed
+        file_a=result_a.file_name,
+        file_b=result_b.file_name,
+        metrics=deltas,
+        what_changed=what_changed,
+        risk_assessment=risk_assessment
     )

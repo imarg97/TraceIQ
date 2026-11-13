@@ -37,6 +37,14 @@ interface TraceStoreState {
   setSearchFilter: (filter: string) => void;
   setProtocolFilter: (proto: string) => void;
   setPcapB: (pcap: PCAPAnalysisResult | null) => void;
+  setPcapA: (pcap: PCAPAnalysisResult | null) => void;
+  uploadPcapA: (file: File) => Promise<void>;
+  uploadPcapB: (file: File) => Promise<void>;
+  loadSampleA: (sampleId: string) => Promise<void>;
+  loadSampleB: (sampleId: string) => Promise<void>;
+  swapPcaps: () => void;
+  clearPcapA: () => void;
+  clearPcapB: () => void;
   runComparison: () => Promise<void>;
   setIsReportModalOpen: (open: boolean) => void;
   clearCapture: () => void;
@@ -211,7 +219,118 @@ export const useTraceStore = create<TraceStoreState>((set, get) => ({
   setSelectedPacket: (packet) => set({ selectedPacket: packet }),
   setSearchFilter: (filter) => set({ searchFilter: filter }),
   setProtocolFilter: (proto) => set({ protocolFilter: proto }),
-  setPcapB: (pcap: PCAPAnalysisResult | null) => set({ pcapB: pcap }),
+  setPcapA: (pcap: PCAPAnalysisResult | null) => {
+    set({ currentPcap: pcap, compareResult: null });
+    const { pcapB } = get();
+    if (pcap && pcapB) {
+      get().runComparison();
+    }
+  },
+
+  setPcapB: (pcap: PCAPAnalysisResult | null) => {
+    set({ pcapB: pcap, compareResult: null });
+    const { currentPcap } = get();
+    if (currentPcap && pcap) {
+      get().runComparison();
+    }
+  },
+
+  uploadPcapA: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await uploadPcapFile(file);
+      const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
+      set({
+        currentPcap: data,
+        recentPcaps: [data, ...prevRecent].slice(0, 8),
+        selectedPacket: data.packets ? data.packets[0] : null,
+        compareResult: null,
+        isLoading: false
+      });
+      const { pcapB } = get();
+      if (pcapB) {
+        await get().runComparison();
+      }
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to analyze PCAP A', isLoading: false });
+    }
+  },
+
+  uploadPcapB: async (file: File) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await uploadPcapFile(file);
+      const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
+      set({
+        pcapB: data,
+        recentPcaps: [data, ...prevRecent].slice(0, 8),
+        compareResult: null,
+        isLoading: false
+      });
+      const { currentPcap } = get();
+      if (currentPcap) {
+        await get().runComparison();
+      }
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to analyze PCAP B', isLoading: false });
+    }
+  },
+
+  loadSampleA: async (sampleId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await loadSamplePcap(sampleId);
+      const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
+      set({
+        currentPcap: data,
+        recentPcaps: [data, ...prevRecent].slice(0, 8),
+        selectedPacket: data.packets ? data.packets[0] : null,
+        compareResult: null,
+        isLoading: false
+      });
+      const { pcapB } = get();
+      if (pcapB) {
+        await get().runComparison();
+      }
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to load sample A', isLoading: false });
+    }
+  },
+
+  loadSampleB: async (sampleId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const data = await loadSamplePcap(sampleId);
+      const prevRecent = get().recentPcaps.filter(p => p.file_name !== data.file_name);
+      set({
+        pcapB: data,
+        recentPcaps: [data, ...prevRecent].slice(0, 8),
+        compareResult: null,
+        isLoading: false
+      });
+      const { currentPcap } = get();
+      if (currentPcap) {
+        await get().runComparison();
+      }
+    } catch (err: any) {
+      set({ error: err.message || 'Failed to load sample B', isLoading: false });
+    }
+  },
+
+  swapPcaps: () => {
+    const { currentPcap, pcapB } = get();
+    set({
+      currentPcap: pcapB,
+      pcapB: currentPcap,
+      compareResult: null
+    });
+    if (pcapB && currentPcap) {
+      get().runComparison();
+    }
+  },
+
+  clearPcapA: () => set({ currentPcap: null, compareResult: null }),
+  clearPcapB: () => set({ pcapB: null, compareResult: null }),
 
   runComparison: async () => {
     const { currentPcap, pcapB } = get();

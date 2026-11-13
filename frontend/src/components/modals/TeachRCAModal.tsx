@@ -150,7 +150,7 @@ export const TeachRCAModal: React.FC<TeachRCAModalProps> = ({
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Claro COS 0_01 MCN Recording Threshold"
+                    placeholder="e.g. Carrier COS 0_01 MCN Recording Threshold"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-ag-darkBorder rounded-xl p-2.5 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-ag-primary font-sans"
@@ -252,7 +252,7 @@ export const TeachRCAModal: React.FC<TeachRCAModalProps> = ({
                 </label>
                 <input
                   type="text"
-                  placeholder="SMPP v3.4 / 3GPP TS 23.038 / Claro Carrier Standard"
+                  placeholder="SMPP v3.4 / 3GPP TS 23.038 / Standard Carrier Core"
                   value={rfcRef}
                   onChange={(e) => setRfcRef(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-black border border-slate-200 dark:border-ag-darkBorder rounded-xl p-2.5 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-ag-primary"

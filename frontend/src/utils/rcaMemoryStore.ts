@@ -24,7 +24,7 @@ const BUILTIN_CARRIER_RULES: CarrierRCARule[] = [
     id: 'rule_vmas_missing_nfam',
     title: 'VMAS SMPP Missed Call (MCN) Triggered without New Voice Message Alert (NFAM)',
     domain: 'VMAS_VAS',
-    triggerKeywords: ['mcn', 'nfam', 'smpp', 'submit_sm', '573338066269', '573202711497', 'mco', 'missed call notification'],
+    triggerKeywords: ['mcn', 'nfam', 'smpp', 'submit_sm', '+15550199', '+15550123', 'smsc', 'missed call notification'],
     signaturePatterns: ['Submit_sm', 'Service: MCN', '0x00000004', 'min_message_duration_sec'],
     technicalVerdict: '⚠️ MCN Submit_sm was transmitted to MCO SMSC, but NFAM Submit_sm was omitted due to short recording (< 1s) or subscriber COS 0_01 provisioning.',
     rootCause: '1. Deposit duration below minimum threshold: Caller hung up less than 1s after beep or during greeting playback. VMAS treated as abandoned call.\n2. Subscriber Class of Service (COS 0_01) XML lacks <NFAMEnabled> permission.\n3. VMAS notification matrix routed only MCN event.',
@@ -88,7 +88,7 @@ const BUILTIN_CARRIER_RULES: CarrierRCARule[] = [
     triggerKeywords: ['hcmn', 'mcn_multiple', 'buzondevoz', 'source_addr_ton', 'source_addr_npi', 'vmassmppserviceparams', 'mcn vs hcmn', 'not for hcmn', 'for mcn it is sending correctly.. but not for hcmn'],
     signaturePatterns: ['Service type: MCN', 'BuzonDeVoz', 'MCN_MULTIPLE', 'source_addr_ton>5'],
     technicalVerdict: '⚠️ MCN Submit_sm succeeds with Alphanumeric Originator (TON: 5 / BuzonDeVoz), but Consolidated HCMN fails if SMSC rejects alphanumeric sender for aggregated batches or VMAS lacks dedicated <service_type>HCMN</service_type> profile.',
-    rootCause: '1. Service Type Profile Mismatch: VMAS defines <name>MCN_MULTIPLE</name> with <service_type>MCN</service_type> instead of <service_type>HCMN</service_type>, preventing the consolidated missed call event mapper from finding the active service profile.\n2. SMSC Alphanumeric Sender Rejection: MCN uses TON: 5 (Alphanumeric 0x05) with SENDERADDR: BuzonDeVoz. Some carrier SMSCs (e.g. Claro MCO) strictly require TON: 1 (International) or TON: 2 (National) with a numeric shortcode for aggregated/bulk notifications (HCMN).\n3. Enable_String_Month configuration mismatch in VMASSMPPServiceParams.',
+    rootCause: '1. Service Type Profile Mismatch: VMAS defines <name>MCN_MULTIPLE</name> with <service_type>MCN</service_type> instead of <service_type>HCMN</service_type>, preventing the consolidated missed call event mapper from finding the active service profile.\n2. SMSC Alphanumeric Sender Rejection: MCN uses TON: 5 (Alphanumeric 0x05) with SENDERADDR: BuzonDeVoz. Some tier-1 carrier SMSCs strictly require TON: 1 (International) or TON: 2 (National) with a numeric shortcode for aggregated/bulk notifications (HCMN).\n3. Enable_String_Month configuration mismatch in VMASSMPPServiceParams.',
     resolutionSteps: [
       'Add dedicated <VMASSMPPServiceParams> block in vmas_smpp.cfg with <name>HCMN</name> and <service_type>HCMN</service_type>.',
       'Verify SMSC (MCO) capabilities for alphanumeric TON: 5 on bulk consolidated alerts vs numeric sender shortcodes.',

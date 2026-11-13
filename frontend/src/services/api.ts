@@ -1,4 +1,4 @@
-import { PCAPAnalysisResult, SamplePCAPItem, PCAPCompareResult, LogAnalysisResult } from '../types';
+import { PCAPAnalysisResult, SamplePCAPItem, PCAPCompareResult, CompareMetricsDelta, LogAnalysisResult } from '../types';
 import { parsePcapArrayBuffer } from '../utils/pcapClientParser';
 import { TelecomKnowledgeMemory } from '../utils/telecomKnowledge';
 import { RCAMemoryStore } from '../utils/rcaMemoryStore';
@@ -575,7 +575,7 @@ Cite specific Frame # indices for all claims. When asked to "draw the flow", gen
     hcmnAnswer += `   - **The Defect**: When VMAS aggregates multiple missed calls into an HCMN event, its internal router requests \`service_type: HCMN\`. Because the profile \`<name>MCN_MULTIPLE</name>\` is assigned \`<service_type>MCN</service_type>\` instead of \`<service_type>HCMN</service_type>\`, the smppMgr dispatcher drops the event with \`NO_MATCHING_SMPP_SERVICE_PROFILE\`.\n`;
     hcmnAnswer += `2. **SMSC Rejection of Alphanumeric TON: 5 on Bulk/Consolidated SMS**:\n`;
     hcmnAnswer += `   - Single MCN notifications allow alphanumeric strings (\`TON: 5\` = Alphanumeric, \`SENDERADDR: BuzonDeVoz\`).\n`;
-    hcmnAnswer += `   - However, many carrier SMSCs (e.g. Claro / MCO) strictly enforce **numeric sender addresses** (\`TON: 1\` International or \`TON: 2\` National) for consolidated batches (HCMN) to prevent spam filtering. If sent with \`TON: 5\`, the SMSC returns \`0x0000000A ESME_RINVSRCADDR\`.\n`;
+    hcmnAnswer += `   - However, many carrier SMSCs strictly enforce **numeric sender addresses** (\`TON: 1\` International or \`TON: 2\` National) for consolidated batches (HCMN) to prevent spam filtering. If sent with \`TON: 5\`, the SMSC returns \`0x0000000A ESME_RINVSRCADDR\`.\n`;
     hcmnAnswer += `3. **\`Enable_String_Month\` Flag**: Ensure date macro string format matches the SMSC text template.\n\n`;
 
     hcmnAnswer += `---\n\n`;
@@ -716,8 +716,8 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
   \`\`\`xml
   <dialogstart type="application/moml+xml" target="conn:az1-vmas-mrfp-1..." name="playPrompt">
     <play barge="true" cleardb="true" offset="1ms" xml:lang="spa-Spanish">
-      <audio uri="file://mavpromptsClaroCol/voice/Spanish/P210.wav"/>
-      <audio uri="file://mavpromptsClaroCol/voice/Spanish/P16.wav"/>
+      <audio uri="file://prompts/voice/Spanish/P210.wav"/>
+      <audio uri="file://prompts/voice/Spanish/P16.wav"/>
       <playexit><send target="source" event="app.playcomplete" namelist="play.amt play.end"/></playexit>
     </play>
   </dialogstart>
@@ -729,7 +729,7 @@ ${matchedKb.resolution_steps.map((step, idx) => `${idx + 1}. **${step}**`).join(
 
 ### 🛠️ 2. Step-by-Step Remediation:
 1. **Update SCXML Dialplan Template**:
-   - In the password entry SCXML flow file (\`/opt/vmas/config/scxml/password_flow.xml\` or config map), ensure \`MrfAudioURI3\` is populated with \`file://mavpromptsClaroCol/voice/Spanish/P2228.wav\`.
+   - In the password entry SCXML flow file (\`/opt/vmas/config/scxml/password_flow.xml\` or config map), ensure \`MrfAudioURI3\` is populated with \`file://prompts/voice/Spanish/P2228.wav\`.
 2. **Verify File Existence on MRFP**:
    - Verify that \`P2228.wav\` exists in \`/var/vmas/prompts/Spanish/P2228.wav\` with \`644\` read permissions.`,
       provider: 'TraceIQ VMAS & SCXML Log Diagnostician'
@@ -1575,7 +1575,7 @@ To get rid of this issue and restore mobile data connectivity for the subscriber
 
         let carrierName = '3GPP IMS Core Network';
         if (rawText.includes('mcc732') || fromHdr?.includes('mcc732') || via?.includes('mcc732')) {
-          carrierName = 'Colombia Claro/Tigo IMS Network (MCC: 732, MNC: 101)';
+          carrierName = 'Standard 3GPP Carrier IMS Network (MCC: 001, MNC: 01)';
         }
 
         const hasSdp = rawText.includes('v=0') || targetPkt.sdp || contentType?.includes('sdp');
@@ -1863,8 +1863,8 @@ You can ask about any frame in that range, for example: *"What does frame ${pack
       const p = target.pkt;
       const wavList = target.wavFiles.length > 0 
         ? target.wavFiles 
-        : ['file://mavpromptsClaroCol/voice/Spanish/P311.wav', 'file://mavpromptsClaroCol/voice/Spanish/P2246.wav'];
-      const digitList = target.digits.length > 0 ? target.digits : ['573332949614'];
+        : ['file://prompts/voice/Spanish/P311.wav', 'file://prompts/voice/Spanish/P2246.wav'];
+      const digitList = target.digits.length > 0 ? target.digits : ['15550199'];
 
       return {
         answer: `### 🎙️ MSML Media Dialog & Audio Prompt Analysis (\`${fileName}\`)
@@ -1888,9 +1888,9 @@ ${digitList.map(d => `* **Dynamic Spoken Variable**: \`${d}\` (Digits)`).join('\
 ${target.rawXml.includes('<msml') ? target.rawXml : `<msml xmlns:cvd="http://convedia.com/ext" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.1">
   <dialogstart type="application/moml+xml" target="conn:az1-vmas-mrfp-0.localdomain5060+1+1660000+96c0e546" name="playVarPrompt">
     <play barge="false" cleardb="true" xml:lang="spa-Spanish">
-      <audio uri="file://mavpromptsClaroCol/voice/Spanish/P311.wav"/>
-      <var type="digits" subtype="gen" value="573332949614"/>
-      <audio uri="file://mavpromptsClaroCol/voice/Spanish/P2246.wav"/>
+      <audio uri="file://prompts/voice/Spanish/P311.wav"/>
+      <var type="digits" subtype="gen" value="15550199"/>
+      <audio uri="file://prompts/voice/Spanish/P2246.wav"/>
       <playexit>
         <send target="source" event="app.playcomplete" namelist="play.amt play.end"/>
       </playexit>
@@ -1902,7 +1902,7 @@ ${target.rawXml.includes('<msml') ? target.rawXml : `<msml xmlns:cvd="http://con
 ---
 
 ### 🔍 Operational Assessment:
-* **Call Execution**: The VMAS Application Server directs the Media Server to concatenate the introductory prompt (\`${wavList[0] || 'P311.wav'}\`), the subscriber digits (\`${digitList[0] || '573332949614'}\`), and the instruction prompt (\`${wavList[1] || 'P2246.wav'}\`).
+* **Call Execution**: The VMAS Application Server directs the Media Server to concatenate the introductory prompt (\`${wavList[0] || 'P311.wav'}\`), the subscriber digits (\`${digitList[0] || '15550199'}\`), and the instruction prompt (\`${wavList[1] || 'P2246.wav'}\`).
 * **Health Status**: ${target.isError ? '⚠️ **Media Server reported a file not found or playback error.**' : '✅ **MSML dialog request constructed normally without media errors.**'}`,
         provider: 'TraceIQ Dynamic MSML & Media Diagnostician'
       };
@@ -2646,21 +2646,136 @@ export async function comparePcaps(pcapA: PCAPAnalysisResult, pcapB: PCAPAnalysi
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pcap_a: pcapA, pcap_b: pcapB })
     });
-    if (res.ok) return await res.json();
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.metrics && data.metrics.length > 0) return data;
+    }
   } catch {
-    // Compare fallback
+    // Fall back to high-fidelity client-side differential engine
   }
+
+  const diffHealth = pcapB.health_score - pcapA.health_score;
+  const statusHealth = diffHealth > 0 ? 'improved' : (diffHealth < 0 ? 'degraded' : 'neutral');
+
+  const failedA = pcapA.failed_calls ?? 0;
+  const failedB = pcapB.failed_calls ?? 0;
+  const diffFailed = failedB - failedA;
+  const statusFailed = diffFailed > 0 ? 'degraded' : (diffFailed < 0 ? 'improved' : 'neutral');
+
+  const diffPackets = pcapB.packet_count - pcapA.packet_count;
+  const diffDuration = Number((pcapB.duration_sec - pcapA.duration_sec).toFixed(3));
+
+  const nodesA = pcapA.call_flow?.nodes || [];
+  const nodesB = pcapB.call_flow?.nodes || [];
+  const diffNodes = nodesB.length - nodesA.length;
+
+  const issuesA = pcapA.issues?.length || 0;
+  const issuesB = pcapB.issues?.length || 0;
+  const diffIssues = issuesB - issuesA;
+
+  const metrics: CompareMetricsDelta[] = [
+    {
+      metric: 'Network Health Score',
+      pcap_a_val: `${pcapA.health_score}%`,
+      pcap_b_val: `${pcapB.health_score}%`,
+      diff: `${diffHealth > 0 ? '+' : ''}${diffHealth}%`,
+      status: statusHealth
+    },
+    {
+      metric: 'Failed Call Sessions',
+      pcap_a_val: String(failedA),
+      pcap_b_val: String(failedB),
+      diff: `${diffFailed > 0 ? '+' : ''}${diffFailed}`,
+      status: statusFailed
+    },
+    {
+      metric: 'Total Packet Volume',
+      pcap_a_val: pcapA.packet_count.toLocaleString(),
+      pcap_b_val: pcapB.packet_count.toLocaleString(),
+      diff: `${diffPackets > 0 ? '+' : ''}${diffPackets.toLocaleString()}`,
+      status: 'neutral'
+    },
+    {
+      metric: 'Capture Duration',
+      pcap_a_val: `${pcapA.duration_sec.toFixed(2)}s`,
+      pcap_b_val: `${pcapB.duration_sec.toFixed(2)}s`,
+      diff: `${diffDuration > 0 ? '+' : ''}${diffDuration.toFixed(2)}s`,
+      status: 'neutral'
+    },
+    {
+      metric: 'Signaling Nodes Active',
+      pcap_a_val: `${nodesA.length} nodes`,
+      pcap_b_val: `${nodesB.length} nodes`,
+      diff: `${diffNodes > 0 ? '+' : ''}${diffNodes}`,
+      status: diffNodes !== 0 ? 'neutral' : 'neutral'
+    },
+    {
+      metric: 'Detected Protocol Anomalies',
+      pcap_a_val: `${issuesA} alerts`,
+      pcap_b_val: `${issuesB} alerts`,
+      diff: `${diffIssues > 0 ? '+' : ''}${diffIssues}`,
+      status: diffIssues > 0 ? 'degraded' : (diffIssues < 0 ? 'improved' : 'neutral')
+    }
+  ];
+
+  // Top response codes extraction
+  const getTopCodes = (pcap: PCAPAnalysisResult) => {
+    if (pcap.top_response_codes && Object.keys(pcap.top_response_codes).length > 0) {
+      return Object.entries(pcap.top_response_codes)
+        .map(([k, v]) => `${k} (${v})`)
+        .join(', ');
+    }
+    const counts: Record<string, number> = {};
+    (pcap.packets || []).forEach(p => {
+      if (p.response_code) {
+        counts[String(p.response_code)] = (counts[String(p.response_code)] || 0) + 1;
+      }
+    });
+    return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(', ') || 'Normal 200 OK';
+  };
+
+  const codesA = getTopCodes(pcapA);
+  const codesB = getTopCodes(pcapB);
+
+  let whatChanged = `### 📊 PCAP Comparative Differential Report\n\n`;
+  whatChanged += `**Baseline Capture A:** \`${pcapA.file_name}\` (${pcapA.packet_count.toLocaleString()} packets, Health: ${pcapA.health_score}%, Failures: ${failedA})\n`;
+  whatChanged += `**Comparative Capture B:** \`${pcapB.file_name}\` (${pcapB.packet_count.toLocaleString()} packets, Health: ${pcapB.health_score}%, Failures: ${failedB})\n\n`;
+
+  whatChanged += `#### 🔍 Key Signaling Findings:\n`;
+  if (diffHealth < 0 || diffFailed > 0) {
+    whatChanged += `- ⚠️ **Degradation Detected**: Capture B exhibits a health score drop of **${Math.abs(diffHealth)}%** with **${diffFailed > 0 ? diffFailed : 0} additional session failures** compared to Baseline A.\n`;
+  } else if (diffHealth > 0) {
+    whatChanged += `- ✅ **Performance Improvement**: Capture B demonstrates an improved health score (+${diffHealth}%) with reduced session failures.\n`;
+  } else {
+    whatChanged += `- ℹ️ **Consistent Performance**: Both captures show parity in network health scoring (${pcapA.health_score}%).\n`;
+  }
+
+  whatChanged += `- **Response Codes in A**: \`${codesA}\`\n`;
+  whatChanged += `- **Response Codes in B**: \`${codesB}\`\n`;
+
+  if (Math.abs(diffDuration) > 1) {
+    whatChanged += `- **Timing Variance**: Capture B duration diverges by \`${diffDuration > 0 ? '+' : ''}${diffDuration.toFixed(2)}s\`.\n`;
+  }
+
+  whatChanged += `\n#### 🎯 Engineering Recommendation:\n`;
+  if (diffHealth < 0) {
+    whatChanged += `Inspect nodes participating in Capture B that generated non-200 OK response codes. Verify timeout limits and media codec negotiations against standard baseline parameters.`;
+  } else {
+    whatChanged += `Signaling flows in Capture B conform to the established baseline. No critical network degradation detected.`;
+  }
+
+  const riskAssessment = (diffHealth < -10 || diffFailed > 0 || diffIssues > 1)
+    ? 'High Risk: Signaling degradation detected with increased failure rates.'
+    : (diffHealth >= 0 && diffFailed <= 0
+        ? 'Low Risk: Signaling flows are consistent and healthy across baseline captures.'
+        : 'Moderate Risk: Minor metric variances observed between captures.');
 
   return {
     file_a: pcapA.file_name,
     file_b: pcapB.file_name,
-    metrics: [
-      { metric: 'Packet Count', pcap_a_val: String(pcapA.packet_count), pcap_b_val: String(pcapB.packet_count), diff: String(pcapA.packet_count - pcapB.packet_count), status: pcapA.packet_count === pcapB.packet_count ? 'MATCH' : 'DIFF' },
-      { metric: 'Duration', pcap_a_val: `${pcapA.duration_sec}s`, pcap_b_val: `${pcapB.duration_sec}s`, diff: `${(pcapA.duration_sec - pcapB.duration_sec).toFixed(2)}s`, status: 'OK' },
-      { metric: 'Health Score', pcap_a_val: `${pcapA.health_score}%`, pcap_b_val: `${pcapB.health_score}%`, diff: `${pcapA.health_score - pcapB.health_score}%`, status: pcapA.health_score >= pcapB.health_score ? 'BETTER' : 'WORSE' }
-    ],
-    what_changed: `Compared ${pcapA.file_name} (${pcapA.packet_count} packets) against ${pcapB.file_name} (${pcapB.packet_count} packets). Timing variance is ${Math.abs(pcapA.duration_sec - pcapB.duration_sec).toFixed(2)}s.`,
-    risk_assessment: 'Low risk. Signaling flows are consistent across baseline captures.'
+    metrics,
+    what_changed: whatChanged,
+    risk_assessment: riskAssessment
   };
 }
 
